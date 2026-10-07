@@ -7,10 +7,7 @@ from openai import OpenAI
 
 
 def build_rag_prompt(query: str, contexts: list[dict[str, Any]]) -> str:
-    """Format retrieved legal context chunks and query into a structured system
-
-    prompt.
-    """
+    """Format retrieved legal context chunks into a structured system prompt."""
     context_str = ""
     for idx, ctx in enumerate(contexts, 1):
         context_str += (
@@ -40,15 +37,19 @@ Answer:"""
 def generate_legal_answer(
     query: str,
     contexts: list[dict[str, Any]],
-    model_name: str = "gpt-4o-mini",
+    model_name: str = "llama-3.1-8b-instant",
 ) -> str:
-    """Generate a legal response synthesized from retrieved context chunks."""
+    """Generate a legal response using open-source models via Groq's free cloud API."""
     if not contexts:
         return "No relevant constitutional provisions were found for your query."
 
     prompt = build_rag_prompt(query, contexts)
 
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    # Groq provides an OpenAI-compatible endpoint
+    client = OpenAI(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=os.getenv("GROQ_API_KEY"),
+    )
 
     response = client.chat.completions.create(
         model=model_name,
