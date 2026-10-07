@@ -5,9 +5,10 @@ description = "RAG application for the Ghana Constitution"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "fastembed>=0.8.1",
     "langchain-text-splitters",
     "pymupdf4llm",
-    "qdrant-client>=1.19.1",
+    "qdrant-client[fastembed]>=1.19.1",
 ]
 
 [build-system]
