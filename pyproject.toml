@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "langchain-text-splitters",
     "pymupdf4llm",
+    "qdrant-client>=1.19.1",
 ]
 
 [build-system]
