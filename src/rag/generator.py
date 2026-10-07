@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from openai import OpenAI
+
+from src.config import GROQ_API_KEY
 
 
 def build_rag_prompt(query: str, contexts: list[dict[str, Any]]) -> str:
@@ -37,18 +38,23 @@ Answer:"""
 def generate_legal_answer(
     query: str,
     contexts: list[dict[str, Any]],
-    model_name: str = "llama-3.1-8b-instant",
+    model_name: str = "openai/gpt-oss-20b",
 ) -> str:
     """Generate a legal response using open-source models via Groq's free cloud API."""
     if not contexts:
         return "No relevant constitutional provisions were found for your query."
+
+    if not GROQ_API_KEY:
+        raise RuntimeError(
+            "GROQ_API_KEY is not set. Add it to a .env file or your environment."
+        )
 
     prompt = build_rag_prompt(query, contexts)
 
     # Groq provides an OpenAI-compatible endpoint
     client = OpenAI(
         base_url="https://api.groq.com/openai/v1",
-        api_key=os.getenv("GROQ_API_KEY"),
+        api_key=GROQ_API_KEY,
     )
 
     response = client.chat.completions.create(

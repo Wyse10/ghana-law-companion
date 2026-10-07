@@ -7,8 +7,9 @@ requires-python = ">=3.10"
 dependencies = [
     "fastembed>=0.8.1",
     "langchain-text-splitters",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
     "pymupdf4llm",
-    "qdrant-client[fastembed]>=1.19.1",
 ]
 
 [build-system]
