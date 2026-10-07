@@ -4,10 +4,47 @@ import re
 from pathlib import Path
 from typing import Any
 
+from langchain_core.documents import Document
+
+from src.config import KNOWLEDGE_BASE_DIR
 from .pdf_converter import (
     convert_pdf_to_markdown,
     convert_pdf_to_page_chunks,
 )
+
+
+def fetch_documents(
+    knowledge_base: str | Path = KNOWLEDGE_BASE_DIR,
+) -> list[Document]:
+    """Load Markdown documents from categorized knowledge-base folders.
+
+    Each immediate subfolder is treated as a document type. Markdown files
+    are loaded recursively and returned as LangChain ``Document`` objects.
+    """
+    base_path = Path(knowledge_base)
+    if not base_path.exists():
+        raise FileNotFoundError(f"Knowledge base directory not found: {base_path}")
+    if not base_path.is_dir():
+        raise NotADirectoryError(f"Knowledge base is not a directory: {base_path}")
+
+    documents: list[Document] = []
+    folders = sorted(path for path in base_path.iterdir() if path.is_dir())
+
+    for folder in folders:
+        doc_type = folder.name
+        for file_path in sorted(folder.rglob("*.md")):
+            documents.append(
+                Document(
+                    page_content=file_path.read_text(encoding="utf-8"),
+                    metadata={
+                        "doc_type": doc_type,
+                        "source": str(file_path),
+                        "file_name": file_path.name,
+                    },
+                )
+            )
+
+    return documents
 
 
 def process_constitution_rag(pdf_path: str) -> list[dict[str, Any]]:

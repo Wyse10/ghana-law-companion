@@ -4,6 +4,7 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW_DATA_DIR = os.path.join(BASE_DIR, "data", "raw")
 MARKDOWN_DATA_DIR = os.path.join(BASE_DIR, "data", "markdown")
+KNOWLEDGE_BASE_DIR = MARKDOWN_DATA_DIR
 
 # Default input files
 DEFAULT_PDF_PATH = os.path.join(RAW_DATA_DIR, "Ghana_1996-en.pdf")

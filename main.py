@@ -5,8 +5,12 @@ import sys
 # Ensure project root is in the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.config import DEFAULT_MD_PATH, DEFAULT_PDF_PATH
-from src.ingestion.legal_chunker import process_constitution_rag
+from src.config import (
+    DEFAULT_MD_PATH,
+    DEFAULT_PDF_PATH,
+    KNOWLEDGE_BASE_DIR,
+)
+from src.ingestion.legal_chunker import fetch_documents, process_constitution_rag
 from src.ingestion.pdf_converter import (
     convert_pdf_to_markdown,
     extract_markdown_chapters,
@@ -56,14 +60,19 @@ def main():
             chapter_file.write(chapter_text + "\n")
     print(f"Extracted {len(chapters)} chapters into '{chapters_dir}'.")
 
-    # 3. Structural Legal Chunker (Primary Strategy: Article/Clause level + Context Headers + Metadata)
+    # 3. Load generated Markdown chunks as LangChain Documents
+    print("\n3. Loading Markdown chunks for retrieval...")
+    documents = fetch_documents(KNOWLEDGE_BASE_DIR)
+    print(f"Loaded {len(documents)} documents from '{KNOWLEDGE_BASE_DIR}'.")
+
+    # 4. Structural Legal Chunker (Primary Strategy: Article/Clause level + Context Headers + Metadata)
     print(
-        "\n3. Executing Structural Legal Chunker (Articles, Context Headers & Metadata)..."
+        "\n4. Executing Structural Legal Chunker (Articles, Context Headers & Metadata)..."
     )
     legal_chunks = process_constitution_rag(DEFAULT_PDF_PATH)
     print(f"Total Structural Chunks Generated: {len(legal_chunks)}")
 
-    # 4. Save processed structural chunks to JSON for Vector DB Ingestion
+    # 5. Save processed structural chunks to JSON for Vector DB Ingestion
     print(
         f"\n4. Saving processed chunks to '{processed_chunks_path}'..."
     )
