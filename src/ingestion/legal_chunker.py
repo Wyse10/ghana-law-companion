@@ -62,65 +62,74 @@ def process_constitution_rag(pdf_path: str) -> list[dict[str, Any]]:
     chunks: list[dict[str, Any]] = []
     current_chapter_num = "Unknown"
     current_chapter_title = "General Provisions"
+    current_article: dict[str, Any] | None = None
 
-    # Regex patterns for Ghana Constitution structural elements
     chapter_pattern = re.compile(
-        r"#\s*CHAPTER\s+(\d+)[\.\s]*\n+(.+)", re.IGNORECASE
+        r"^\s*#{1,6}\s+\*{0,2}CHAPTER\s+(\d+)\.\s+(.+?)\*{0,2}\s*$",
+        re.IGNORECASE,
     )
     article_pattern = re.compile(
-        r"(?:##\s*)?(\d+)\.\s+([^\n]+)", re.IGNORECASE
+        r"^\s*#{1,6}\s+\*{0,2}(\d+)\.\s+(.+?)\*{0,2}\s*$",
+        re.IGNORECASE,
     )
     cross_ref_pattern = re.compile(
         r"(?:article|articles|clause|clauses)\s+(\d+)", re.IGNORECASE
     )
 
+    def flush_article() -> None:
+        nonlocal current_article
+        if current_article is None:
+            return
+
+        body = "\n".join(current_article.pop("_body_lines")).strip()
+        if body:
+            current_article["text"] = current_article.pop("_header") + body
+            chunks.append(current_article.copy())
+        current_article = None
+
     for page_info in page_data:
-        # PyMuPDF4LLM page index is 0-based; add 1 for 1-based page numbering
-        page_num = page_info["metadata"].get("page", 0) + 1
+        page_num = page_info["metadata"].get("page_number", 1)
         page_text = page_info.get("text", "")
 
-        lines = page_text.split("\n")
-
-        for line in lines:
+        for line in page_text.split("\n"):
             line_str = line.strip()
             if not line_str:
                 continue
 
-            # Detect Chapter transition
-            chap_match = chapter_pattern.search(line_str)
+            chap_match = chapter_pattern.match(line_str)
             if chap_match:
+                flush_article()
                 current_chapter_num = chap_match.group(1)
                 current_chapter_title = chap_match.group(2).strip()
                 continue
 
-            # Detect Article transition
-            art_match = article_pattern.search(line_str)
+            art_match = article_pattern.match(line_str)
             if art_match:
+                flush_article()
                 art_num = art_match.group(1)
                 art_title = art_match.group(2).strip()
-
-                # Extract legal cross-references inside the line
                 refs = list(set(cross_ref_pattern.findall(line_str)))
-
-                # Context Header injected to ensure optimal vector embeddings
                 context_header = (
                     f"Chapter {current_chapter_num}: {current_chapter_title}\n"
                     f"Article {art_num}: {art_title}\n\n"
                 )
+                current_article = {
+                    "_header": context_header,
+                    "_body_lines": [line_str],
+                    "metadata": {
+                        "chapter_number": current_chapter_num,
+                        "chapter_title": current_chapter_title,
+                        "article_number": art_num,
+                        "article_title": art_title,
+                        "page": page_num,
+                        "cross_references": refs,
+                        "source": pdf_path,
+                    },
+                }
+                continue
 
-                chunks.append(
-                    {
-                        "text": context_header + line_str,
-                        "metadata": {
-                            "chapter_number": current_chapter_num,
-                            "chapter_title": current_chapter_title,
-                            "article_number": art_num,
-                            "article_title": art_title,
-                            "page": page_num,
-                            "cross_references": refs,
-                            "source": pdf_path,
-                        },
-                    }
-                )
+            if current_article is not None:
+                current_article["_body_lines"].append(line_str)
 
+    flush_article()
     return chunks

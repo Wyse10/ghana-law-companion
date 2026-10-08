@@ -96,15 +96,12 @@ def main():
     qdrant_client = init_vector_store(db_path=db_path)
 
     print("\n7. Embedding and Indexing Chunks into Qdrant (using BAAI/bge-base-en-v1.5)...")
-    index_chunks(
+    qdrant_client = index_chunks(
         json_path=processed_chunks_path,
         db_path=db_path,
     )
 
-    # Verify Qdrant points count
-    if qdrant_client.collection_exists("ghana_constitution"):
-        info = qdrant_client.get_collection("ghana_constitution")
-        print(f"Indexed Point Count in Qdrant: {info.points_count}")
+    print(f"Indexed Point Count in local vector store: {len(qdrant_client.payloads)}")
 
     # ------------------------------------------------------------------
     # PHASE 3: Testing End-to-End Retrieval & RAG Generation

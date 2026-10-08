@@ -21,6 +21,7 @@ def index_chunks(
     model = TextEmbedding(model_name=MODEL_NAME)
     vectors = [vector.tolist() for vector in model.embed(documents)]
     store = LocalVectorStore(db_path)
+    store.reset()
     store.add(vectors, payloads)
 
     print("Indexing complete!")
