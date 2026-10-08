@@ -1,0 +1,402 @@
+[
+  {
+    "id": "eval_001",
+    "query": "What are the valid constitutional reasons for restricting a person's personal liberty under the Constitution?",
+    "expected_chapter": "5",
+    "expected_articles": ["14"],
+    "ground_truth_answer": "Under Article 14(1), personal liberty may be restricted in accordance with procedures permitted by law, including executing a court sentence or order for a criminal offence or contempt, bringing a person before court, caring for or treating persons with contagious diseases, unsound mind, drug/alcohol addiction, or vagrancy, educating/protecting minors under 18, preventing unlawful entry or executing deportation/extradition, and upon reasonable suspicion of committing or being about to commit a crime.",
+    "category": "Fundamental Human Rights and Freedoms"
+  },
+  {
+    "id": "eval_002",
+    "query": "Under what circumstances is an intentional deprivation of life not considered a violation of the constitutional right to life?",
+    "expected_chapter": "5",
+    "expected_articles": ["13"],
+    "ground_truth_answer": "According to Article 13, deprivation of life is not a violation if it results from executing a court sentence for a criminal offence, or from a lawful act of war, or from reasonable force used for self-defence or defence of property, effecting lawful arrest or preventing escape, suppressing a riot, insurrection, or mutiny, or preventing the commission of a crime.",
+    "category": "Fundamental Human Rights and Freedoms"
+  },
+  {
+    "id": "eval_003",
+    "query": "What rules govern the time within which a detained or arrested person must be brought before court?",
+    "expected_chapter": "5",
+    "expected_articles": ["14"],
+    "ground_truth_answer": "Pursuant to Article 14(3), any person arrested, restricted, or detained to bring them before court or upon reasonable suspicion of a criminal offence must be brought before a court within forty-eight hours after the arrest, restriction, or detention if they are not released.",
+    "category": "Fundamental Human Rights and Freedoms"
+  },
+  {
+    "id": "eval_004",
+    "query": "How does the Constitution protect individuals against double jeopardy and retrospective criminal laws?",
+    "expected_chapter": "5",
+    "expected_articles": ["19"],
+    "ground_truth_answer": "Under Article 19(5) and 19(7), no person shall be tried for a criminal offence that does not constitute an offence at the time it took place or be subjected to a penalty heavier than what was applicable when the offence was committed. Additionally, Article 19(7) protects individuals against double jeopardy by barring retry for an offence of which they have been previously convicted or acquitted, except by order of a superior court upon appeal or review.",
+    "category": "Fundamental Human Rights and Freedoms"
+  },
+  {
+    "id": "eval_005",
+    "query": "Under what conditions can private property be compulsorily taken possession of or acquired by the State?",
+    "expected_chapter": "5",
+    "expected_articles": ["20"],
+    "ground_truth_answer": "Article 20 provides that compulsory acquisition of property can only occur if it is necessary in the interest of defence, public safety, public order, public morality, public health, or town/country planning, and is governed by a law providing for prompt payment of fair and adequate compensation with right of access to the High Court for determination.",
+    "category": "Fundamental Human Rights and Freedoms"
+  },
+  {
+    "id": "eval_006",
+    "query": "What process must the President follow to create a new region or alter regional boundaries?",
+    "expected_chapter": "2",
+    "expected_articles": ["5"],
+    "ground_truth_answer": "Under Article 5, the President, upon receiving a petition and acting on the advice of the Council of State (or on their advice without a petition), appoints a commission of inquiry. If the commission finds a need and substantial demand, it recommends a referendum. The President refers this to the Electoral Commission. If the required voting thresholds are met, the President issues a constitutional instrument to give effect to the referendum results.",
+    "category": "Territories of Ghana"
+  },
+  {
+    "id": "eval_007",
+    "query": "What constitutes the sovereign territory of Ghana according to the Constitution?",
+    "expected_chapter": "2",
+    "expected_articles": ["4"],
+    "ground_truth_answer": "Under Article 4, the territory of Ghana consists of the regions existing immediately before the coming into force of the Constitution and any other areas that may be declared as part of Ghana, including the territorial sea, air space, and continental shelf.",
+    "category": "Territories of Ghana"
+  },
+  {
+    "id": "eval_008",
+    "query": "What threshold of voter turnout and approval is required in a referendum to create or alter a region?",
+    "expected_chapter": "2",
+    "expected_articles": ["5"],
+    "ground_truth_answer": "Under Article 5(8), a referendum to alter boundaries or create a new region requires at least 50% of registered voters in the affected area to vote, and at least 80% of those voting must vote in favor of the proposal.",
+    "category": "Territories of Ghana"
+  },
+  {
+    "id": "eval_009",
+    "query": "Who is responsible for conducting referenda regarding regional boundary changes or creations?",
+    "expected_chapter": "2",
+    "expected_articles": ["5"],
+    "ground_truth_answer": "Under Article 5(6), the Electoral Commission is responsible for organizing, conducting, and supervising any referendum held for the creation, merger, or alteration of regional boundaries.",
+    "category": "Territories of Ghana"
+  },
+  {
+    "id": "eval_010",
+    "query": "What role does the Council of State play in the alteration or creation of regions?",
+    "expected_chapter": "2",
+    "expected_articles": ["5"],
+    "ground_truth_answer": "Under Article 5(1), the President must consult the Council of State upon receiving a petition to alter or create a region, and acts on its advice to appoint a Commission of Inquiry.",
+    "category": "Territories of Ghana"
+  },
+  {
+    "id": "eval_011",
+    "query": "Can a Ghanaian citizen hold dual citizenship, and are there restrictions on public offices they can occupy?",
+    "expected_chapter": "3",
+    "expected_articles": ["8"],
+    "ground_truth_answer": "Yes, Article 8(1) allows a citizen of Ghana to hold citizenship of another country. However, Article 8(2) specifies that a dual citizen cannot be appointed to key positions including Ambassador/High Commissioner, Secretary to Cabinet, Chief of Defence Staff or Service Chief, Inspector-General of Police, Commissioner of Customs, Director of Immigration Service, or any office specified by Parliament.",
+    "category": "Citizenship"
+  },
+  {
+    "id": "eval_012",
+    "query": "How is citizenship by birth defined under the Constitution of Ghana?",
+    "expected_chapter": "3",
+    "expected_articles": ["6"],
+    "ground_truth_answer": "Under Article 6(1), a person is a citizen of Ghana by birth if they were born in or outside Ghana and at the date of their birth at least one of their parents or grandparents was a citizen of Ghana.",
+    "category": "Citizenship"
+  },
+  {
+    "id": "eval_013",
+    "query": "Under what conditions can a person born in Ghana to non-Ghanaian parents be presumed a citizen?",
+    "expected_chapter": "3",
+    "expected_articles": ["6"],
+    "ground_truth_answer": "Under Article 6(2), a child of not more than seven years of age found in Ghana whose parents are not known is presumed to be a citizen of Ghana by birth.",
+    "category": "Citizenship"
+  },
+  {
+    "id": "eval_014",
+    "query": "How can a foreign spouse acquire Ghanaian citizenship upon marriage to a Ghanaian citizen?",
+    "expected_chapter": "3",
+    "expected_articles": ["7"],
+    "ground_truth_answer": "Under Article 7(1), a person married to a citizen of Ghana may, upon application in the prescribed manner, be registered as a citizen of Ghana.",
+    "category": "Citizenship"
+  },
+  {
+    "id": "eval_015",
+    "query": "Under what circumstances can a citizen of Ghana by registration or naturalization be deprived of their citizenship?",
+    "expected_chapter": "3",
+    "expected_articles": ["9"],
+    "ground_truth_answer": "Under Article 9, the High Court may deprive a naturalized or registered citizen of citizenship if it was obtained by fraud, false representation, or concealment of material facts, or if the person shows disloyalty or acts contrary to national security.",
+    "category": "Citizenship"
+  },
+  {
+    "id": "eval_016",
+    "query": "What comprises the laws of Ghana according to the Constitution, and how do Orders, Rules, or Regulations come into force?",
+    "expected_chapter": "4",
+    "expected_articles": ["11"],
+    "ground_truth_answer": "Article 11(1) states that the laws of Ghana comprise the Constitution, enactments by Parliament, Orders/Rules/Regulations made under constitutional power, existing law, and the common law. Under Article 11(7), any Order, Rule, or Regulation must be laid before Parliament, published in the Gazette on that day, and comes into force 21 sitting days later unless annulled by a two-thirds majority vote of Parliament.",
+    "category": "The Laws of Ghana"
+  },
+  {
+    "id": "eval_017",
+    "query": "What is included within the definition of the common law of Ghana?",
+    "expected_chapter": "4",
+    "expected_articles": ["11"],
+    "ground_truth_answer": "Under Article 11(2), the common law of Ghana includes the rules of law generally known as common law, the rules of equity, and customary law, including applicable customary rules of specific communities.",
+    "category": "The Laws of Ghana"
+  },
+  {
+    "id": "eval_018",
+    "query": "What is the supreme law of Ghana, and what happens to any law inconsistent with it?",
+    "expected_chapter": "1",
+    "expected_articles": ["1", "2"],
+    "ground_truth_answer": "Under Article 1(2), the Constitution is the supreme law of Ghana, and any other law found to be inconsistent with any provision of the Constitution shall, to the extent of the inconsistency, be void.",
+    "category": "The Laws of Ghana"
+  },
+  {
+    "id": "eval_019",
+    "query": "Who holds the authority to determine whether a statutory provision or enactment is inconsistent with the Constitution?",
+    "expected_chapter": "1",
+    "expected_articles": ["2"],
+    "ground_truth_answer": "Under Article 2(1), the Supreme Court has exclusive jurisdiction to declare any law or act inconsistent with or in contravention of a provision of the Constitution.",
+    "category": "The Laws of Ghana"
+  },
+  {
+    "id": "eval_020",
+    "query": "What is the order of hierarchy among the sources of law in Ghana?",
+    "expected_chapter": "4",
+    "expected_articles": ["11"],
+    "ground_truth_answer": "Pursuant to Article 11(1), the order of hierarchy is: (a) The Constitution; (b) Enactments made by or under the authority of Parliament; (c) Orders, Rules, and Regulations; (d) Existing Law; and (e) The Common Law.",
+    "category": "The Laws of Ghana"
+  },
+  {
+    "id": "eval_021",
+    "query": "What steps must the President take when declaring a state of emergency, and how long does the declaration last without Parliamentary extension?",
+    "expected_chapter": "5",
+    "expected_articles": ["31"],
+    "ground_truth_answer": "Under Article 31, the President acts on the advice of the Council of State to declare a state of emergency by Gazette Proclamation and must immediately place the facts before Parliament. The declaration ceases after seven days from publication unless approved by a majority of Parliament within 72 hours. Once approved by Parliament, it stays in force for up to three months unless extended or revoked earlier.",
+    "category": "Emergency Powers"
+  },
+  {
+    "id": "eval_022",
+    "query": "For how long can Parliament extend a state of emergency at any one time?",
+    "expected_chapter": "5",
+    "expected_articles": ["31"],
+    "ground_truth_answer": "Under Article 31(3), Parliament may extend a state of emergency declaration for period(s) not exceeding one month at a time.",
+    "category": "Emergency Powers"
+  },
+  {
+    "id": "eval_023",
+    "query": "What constitutional protections remain in force for persons restricted or detained under emergency powers?",
+    "expected_chapter": "5",
+    "expected_articles": ["32"],
+    "ground_truth_answer": "Under Article 32, a person detained under emergency powers must within 24 hours be furnished with written grounds of detention, relatives notified within 24 hours, case reviewed by a tribunal chaired by a Supreme Court nominee within 3 weeks, and granted access to legal counsel.",
+    "category": "Emergency Powers"
+  },
+  {
+    "id": "eval_024",
+    "query": "Under what circumstances can a state of emergency be declared in Ghana?",
+    "expected_chapter": "5",
+    "expected_articles": ["31"],
+    "ground_truth_answer": "Under Article 31(9), a state of emergency can be declared if circumstances exist in Ghana or part of Ghana that threaten public safety, national defense, essential supplies/services, or are caused by natural disasters.",
+    "category": "Emergency Powers"
+  },
+  {
+    "id": "eval_025",
+    "query": "Can the President revoke a state of emergency proclamation independently?",
+    "expected_chapter": "5",
+    "expected_articles": ["31"],
+    "ground_truth_answer": "Under Article 31(7), a state of emergency declaration may be revoked at any time by the President or by a resolution supported by a majority of all Members of Parliament.",
+    "category": "Emergency Powers"
+  },
+  {
+    "id": "eval_026",
+    "query": "What are the major functions of the Electoral Commission under the Constitution?",
+    "expected_chapter": "7",
+    "expected_articles": ["45"],
+    "ground_truth_answer": "Under Article 45, the Electoral Commission's functions include compiling and revising the voter register, demarcating electoral boundaries for national and local elections, conducting and supervising all public elections and referenda, educating the public on the electoral process, undertaking voter registration expansion, and performing other duties prescribed by law.",
+    "category": "Representation of the People"
+  },
+  {
+    "id": "eval_027",
+    "query": "What criteria qualify a citizen of Ghana to register as a voter?",
+    "expected_chapter": "7",
+    "expected_articles": ["42"],
+    "ground_truth_answer": "Under Article 42, every citizen of Ghana who is eighteen years of age or above and of sound mind has the right to vote and is entitled to be registered as a voter for public elections and referenda.",
+    "category": "Representation of the People"
+  },
+  {
+    "id": "eval_028",
+    "query": "How is the Electoral Commission composed and appointed?",
+    "expected_chapter": "7",
+    "expected_articles": ["43", "70"],
+    "ground_truth_answer": "Under Article 43, the Electoral Commission consists of a Chairman, two Deputy Chairmen, and four other members, all appointed by the President acting on the advice of the Council of State per Article 70(2).",
+    "category": "Representation of the People"
+  },
+  {
+    "id": "eval_029",
+    "query": "How often must constituency boundaries be reviewed by the Electoral Commission?",
+    "expected_chapter": "7",
+    "expected_articles": ["47"],
+    "ground_truth_answer": "Under Article 47(5), the Electoral Commission must review constituency boundaries at intervals of not less than seven years, or within twelve months after the publication of national population census figures.",
+    "category": "Representation of the People"
+  },
+  {
+    "id": "eval_030",
+    "query": "Can voting in public elections or referenda in Ghana be conducted by secret ballot?",
+    "expected_chapter": "7",
+    "expected_articles": ["49"],
+    "ground_truth_answer": "Yes, Article 49 mandates that at any public election or referendum, voting shall be by secret ballot.",
+    "category": "Representation of the People"
+  },
+  {
+    "id": "eval_031",
+    "query": "Who assumes the functions of the President when both the President and Vice-President are unable to perform their duties?",
+    "expected_chapter": "8",
+    "expected_articles": ["60"],
+    "ground_truth_answer": "Under Article 60(11), if both the President and Vice-President are unable to perform the functions of the President, the Speaker of Parliament performs those functions until the President or Vice-President can resume duties or a new President assumes office. If assuming office due to death, resignation, or removal of both, a presidential election must be held within three months (Article 60(13)).",
+    "category": "The Executive"
+  },
+  {
+    "id": "eval_032",
+    "query": "What are the constitutional requirements to qualify as a candidate for election as President of Ghana?",
+    "expected_chapter": "8",
+    "expected_articles": ["62"],
+    "ground_truth_answer": "Under Article 62, a person qualifies to be candidate for President if they are a citizen of Ghana by birth, at least forty years of age, and qualified to be elected a Member of Parliament.",
+    "category": "The Executive"
+  },
+  {
+    "id": "eval_033",
+    "query": "What percentage of votes must a presidential candidate obtain to win an election in the first round?",
+    "expected_chapter": "8",
+    "expected_articles": ["63"],
+    "ground_truth_answer": "Under Article 63(3), a presidential candidate must receive more than fifty percent (50% + 1) of the total valid votes cast to be declared elected.",
+    "category": "The Executive"
+  },
+  {
+    "id": "eval_034",
+    "query": "What is the term of office of the President, and how many terms can one individual serve?",
+    "expected_chapter": "8",
+    "expected_articles": ["66"],
+    "ground_truth_answer": "Under Article 66, the term of office of the President is four years, and no person can serve more than two terms as President.",
+    "category": "The Executive"
+  },
+  {
+    "id": "eval_035",
+    "query": "How are Ministers of State appointed, and what proportion must come from Parliament?",
+    "expected_chapter": "8",
+    "expected_articles": ["78"],
+    "ground_truth_answer": "Under Article 78(1), Ministers of State are appointed by the President with prior approval of Parliament, with the majority chosen from among Members of Parliament.",
+    "category": "The Executive"
+  },
+  {
+    "id": "eval_036",
+    "query": "What requirements must an organization meet regarding its structure and membership in order to be registered as a political party?",
+    "expected_chapter": "7",
+    "expected_articles": ["55"],
+    "ground_truth_answer": "Under Article 55, a political party must have a national character without membership based on ethnic, religious, or regional divisions. Its internal organization must conform to democratic principles. For registration, it must have at least one founding member resident or registered as a voter in each district, branches in all regions, organization in at least two-thirds of districts per region, no sectional connotations in its name/symbol, and national executive committee members chosen from all regions.",
+    "category": "Political Parties"
+  },
+  {
+    "id": "eval_037",
+    "query": "Are political parties required to declare their assets and sources of funding publicly?",
+    "expected_chapter": "7",
+    "expected_articles": ["55"],
+    "ground_truth_answer": "Yes, Article 55(14) and 55(15) require political parties to declare their assets and expenditure to the Electoral Commission within twenty-one days before an election and submit audited accounts annually.",
+    "category": "Political Parties"
+  },
+  {
+    "id": "eval_038",
+    "query": "Can state-owned media discriminate against any political party in coverage or access?",
+    "expected_chapter": "7",
+    "expected_articles": ["55"],
+    "ground_truth_answer": "No, Article 55(11) mandates that state-owned media must afford fair and equal opportunities and coverage to all registered political parties to present their programs.",
+    "category": "Political Parties"
+  },
+  {
+    "id": "eval_039",
+    "query": "Can non-citizens contribute financially to political party activities or election campaigns in Ghana?",
+    "expected_chapter": "7",
+    "expected_articles": ["55"],
+    "ground_truth_answer": "No, Article 55(15) provides that only citizens of Ghana may contribute financially or otherwise to political parties.",
+    "category": "Political Parties"
+  },
+  {
+    "id": "eval_040",
+    "query": "Are political parties allowed to sponsor candidates in District Assembly or local government elections?",
+    "expected_chapter": "20",
+    "expected_articles": ["248"],
+    "ground_truth_answer": "No, under Article 248, a candidate seeking election to a District Assembly or local government unit shall present themselves as an individual, and no political party shall endorse, sponsor, or campaign for any candidate.",
+    "category": "Political Parties"
+  },
+  {
+    "id": "eval_041",
+    "query": "What composition and jurisdiction define the Supreme Court of Ghana?",
+    "expected_chapter": "11",
+    "expected_articles": ["128", "130"],
+    "ground_truth_answer": "Under Article 128, the Supreme Court consists of the Chief Justice and not less than nine other Justices. Under Article 130, it has exclusive original jurisdiction over constitutional interpretation, validity of enactments, and constitutional enforcement.",
+    "category": "The Judiciary"
+  },
+  {
+    "id": "eval_042",
+    "query": "How is the Chief Justice of Ghana appointed under the Constitution?",
+    "expected_chapter": "11",
+    "expected_articles": ["144"],
+    "ground_truth_answer": "Under Article 144(1), the Chief Justice is appointed by the President acting in consultation with the Council of State and with the approval of Parliament.",
+    "category": "The Judiciary"
+  },
+  {
+    "id": "eval_043",
+    "query": "What is the retiring age for Superior Court judges in Ghana?",
+    "expected_chapter": "11",
+    "expected_articles": ["145"],
+    "ground_truth_answer": "Under Article 145(2), a Justice of the Supreme Court or Court of Appeal retires at seventy years, while a Justice of the High Court or Regional Tribunal retires at sixty-five years.",
+    "category": "The Judiciary"
+  },
+  {
+    "id": "eval_044",
+    "query": "What grounds and procedure permit the removal of a Superior Court judge from office?",
+    "expected_chapter": "11",
+    "expected_articles": ["146"],
+    "ground_truth_answer": "Under Article 146, a Superior Court judge can only be removed for stated misbehavior, incompetence, or inability to perform duties due to infirmity of body/mind, investigated by a committee appointed by the Chief Justice or President.",
+    "category": "The Judiciary"
+  },
+  {
+    "id": "eval_045",
+    "query": "Does the Supreme Court have supervisory power over lower courts in Ghana?",
+    "expected_chapter": "11",
+    "expected_articles": ["132"],
+    "ground_truth_answer": "Yes, Article 132 gives the Supreme Court supervisory jurisdiction over all courts and administrative adjudicating authorities in Ghana, issuing orders such as certiorari, prohibition, mandamus, and habeas corpus.",
+    "category": "The Judiciary"
+  },
+  {
+    "id": "eval_046",
+    "query": "How is the Speaker of Parliament elected, and who is eligible for the position?",
+    "expected_chapter": "10",
+    "expected_articles": ["95"],
+    "ground_truth_answer": "Under Article 95(1), the Speaker is elected by Members of Parliament from among persons who are Members of Parliament or qualified to be elected as such.",
+    "category": "The Legislature"
+  },
+  {
+    "id": "eval_047",
+    "query": "What qualifications are required for a citizen to be eligible for election to Parliament?",
+    "expected_chapter": "10",
+    "expected_articles": ["94"],
+    "ground_truth_answer": "Under Article 94(1), a candidate must be a citizen of Ghana, at least twenty-one years old, a registered voter, resident or hailing from the constituency, and have paid all taxes.",
+    "category": "The Legislature"
+  },
+  {
+    "id": "eval_048",
+    "query": "What disqualifies a person from becoming a Member of Parliament?",
+    "expected_chapter": "10",
+    "expected_articles": ["94"],
+    "ground_truth_answer": "Under Article 94(2), disqualifications include holding allegiance to a foreign country, undischarged bankruptcy, unsound mind, conviction for treason, fraud, or dishonesty, or holding key public/civil service offices.",
+    "category": "The Legislature"
+  },
+  {
+    "id": "eval_049",
+    "query": "What quorum is required for Parliament to transact business other than voting?",
+    "expected_chapter": "10",
+    "expected_articles": ["102"],
+    "ground_truth_answer": "Under Article 102, a quorum of Parliament, apart from the person presiding, is one-third of all Members of Parliament.",
+    "category": "The Legislature"
+  },
+  {
+    "id": "eval_050",
+    "query": "What is the normal duration of a Parliament before automatic dissolution?",
+    "expected_chapter": "10",
+    "expected_articles": ["113"],
+    "ground_truth_answer": "Under Article 113(1), Parliament continues for four years from the date of its first sitting and then stands dissolved.",
+    "category": "The Legislature"
+  }
+]
