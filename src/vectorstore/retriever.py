@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from fastembed import TextEmbedding
 
 MODEL_NAME = "BAAI/bge-base-en-v1.5"
 from .store import LocalVectorStore
+
+
+@lru_cache(maxsize=1)
+def _get_embedding_model() -> TextEmbedding:
+    return TextEmbedding(model_name=MODEL_NAME)
 
 
 def retrieve_relevant_context(
@@ -18,7 +24,7 @@ def retrieve_relevant_context(
 
     chunks from Qdrant.
     """
-    model = TextEmbedding(model_name=MODEL_NAME)
+    model = _get_embedding_model()
     query_vector = next(model.embed([query])).tolist()
     results = qdrant_client.query(vector=query_vector, limit=top_k)
 

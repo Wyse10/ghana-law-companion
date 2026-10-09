@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -20,8 +21,10 @@ load_dotenv(override=True)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET_PATH = PROJECT_ROOT / "data" / "evals" / "golden_dataset.json"
 DB_PATH = str(PROJECT_ROOT / "data" / "qdrant_db")
-# Keep this in sync with the models currently exposed by the Groq account.
+
+# Keep this in sync with the model exposed by the Groq account.
 MODEL = "groq/qwen/qwen3.8-27b"
+EVAL_CONTEXT_LIMIT = int(os.getenv("EVAL_CONTEXT_LIMIT", "6"))
 
 
 @dataclass(frozen=True)
@@ -97,7 +100,7 @@ def calculate_ndcg(
 def fetch_context(
     query: str, vector_store: LocalVectorStore | None = None
 ) -> list[dict[str, Any]]:
-    """Retrieve current local vector-store context for an evaluation query."""
+    """Retrieve local vector-store context for an evaluation query."""
     store = vector_store or LocalVectorStore(DB_PATH)
     return retrieve_relevant_context(query=query, qdrant_client=store, top_k=10)
 
@@ -136,13 +139,17 @@ def evaluate_retrieval(
 def evaluate_answer(
     test: TestQuestion,
     vector_store: LocalVectorStore | None = None,
+    generated_answer: str | None = None,
+    retrieved_docs: list[dict[str, Any]] | None = None,
 ) -> tuple[AnswerEval, str, list[dict[str, Any]]]:
     if not GROQ_API_KEY:
         raise RuntimeError(
             "GROQ_API_KEY is not set. Add it to the .env file before running answer evaluation."
         )
 
-    generated_answer, retrieved_docs = answer_question(test.query, vector_store)
+    if generated_answer is None or retrieved_docs is None:
+        generated_answer, retrieved_docs = answer_question(test.query, vector_store)
+
     judge_messages = [
         {
             "role": "system",
@@ -154,7 +161,8 @@ def evaluate_answer(
         {
             "role": "user",
             "content": (
-                f"Question:\n{test.query}\n\nGenerated Answer:\n{generated_answer}\n\n"
+                f"Question:\n{test.query}\n\n"
+                f"Generated Answer:\n{generated_answer}\n\n"
                 f"Reference Answer:\n{test.ground_truth_answer}\n\n"
                 "Return feedback plus accuracy, completeness, and relevance scores from 1 to 5."
             ),
@@ -165,11 +173,45 @@ def evaluate_answer(
         messages=judge_messages,
         response_format=AnswerEval,
         api_key=GROQ_API_KEY,
+        max_tokens=256,
     )
     content = response.choices[0].message.content
     if not content:
         raise RuntimeError("The evaluation judge returned an empty response.")
     return AnswerEval.model_validate_json(content), generated_answer, retrieved_docs
+
+
+def evaluate_test_case(
+    test: TestQuestion,
+    vector_store: LocalVectorStore | None = None,
+) -> tuple[RetrievalEval, AnswerEval, str, list[dict[str, Any]]]:
+    """Evaluate one test case while retrieving its context only once."""
+    retrieved_docs = fetch_context(test.query, vector_store)
+    mrr_scores = [calculate_mrr(keyword, retrieved_docs) for keyword in test.keywords]
+    ndcg_scores = [
+        calculate_ndcg(keyword, retrieved_docs) for keyword in test.keywords
+    ]
+    total_keywords = len(test.keywords)
+    keywords_found = sum(score > 0 for score in mrr_scores)
+    retrieval_result = RetrievalEval(
+        mrr=sum(mrr_scores) / total_keywords if total_keywords else 0.0,
+        ndcg=sum(ndcg_scores) / total_keywords if total_keywords else 0.0,
+        keywords_found=keywords_found,
+        total_keywords=total_keywords,
+        keyword_coverage=(
+            keywords_found / total_keywords * 100 if total_keywords else 0.0
+        ),
+    )
+    generated_answer = generate_legal_answer(
+        test.query, retrieved_docs[:EVAL_CONTEXT_LIMIT]
+    )
+    answer_result, _, _ = evaluate_answer(
+        test,
+        vector_store,
+        generated_answer=generated_answer,
+        retrieved_docs=retrieved_docs,
+    )
+    return retrieval_result, answer_result, generated_answer, retrieved_docs
 
 
 def main() -> None:
@@ -182,11 +224,19 @@ def main() -> None:
     if not 0 <= test_number < len(tests):
         raise SystemExit(f"Test number must be between 0 and {len(tests) - 1}.")
     test = tests[test_number]
-    result = evaluate_retrieval(test)
-    print(f"Test: {test.id}")
-    print(f"MRR: {result.mrr:.4f}")
-    print(f"nDCG: {result.ndcg:.4f}")
-    print(f"Keyword coverage: {result.keyword_coverage:.1f}%")
+    ret_eval, ans_eval, gen_ans, _ = evaluate_test_case(test)
+
+    print(f"\n{'=' * 60}")
+    print(f"Test ID: {test.id}")
+    print(f"{'=' * 60}")
+    print(f"MRR: {ret_eval.mrr:.4f}")
+    print(f"nDCG: {ret_eval.ndcg:.4f}")
+    print(f"Keyword Coverage: {ret_eval.keyword_coverage:.1f}%")
+    print(f"\nAccuracy: {ans_eval.accuracy:.2f}/5.0")
+    print(f"Completeness: {ans_eval.completeness:.2f}/5.0")
+    print(f"Relevance: {ans_eval.relevance:.2f}/5.0")
+    print(f"Feedback: {ans_eval.feedback}")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

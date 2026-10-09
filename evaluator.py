@@ -1,73 +1,38 @@
+# evaluator.py
 from __future__ import annotations
 
-import pandas as pd
 import gradio as gr
+import pandas as pd
+from litellm.exceptions import RateLimitError as LiteLLMRateLimitError
+from openai import RateLimitError as OpenAIRateLimitError
 
-# Project Imports from src.eval.eval
 from src.eval.eval import (
-    load_tests,
-    evaluate_retrieval,
-    evaluate_answer,
-    TestQuestion,
-    LocalVectorStore,
+    DATASET_PATH,
     DB_PATH,
+    LocalVectorStore,
+    TestQuestion,
+    evaluate_test_case,
+    load_tests,
 )
 
-# Initialize vector store instance once globally
 vector_store = LocalVectorStore(DB_PATH)
 
 
 def run_single_evaluation(test_index: int):
-    """Run evaluation for a single selected test case index."""
-    try:
-        tests = load_tests()
-    except Exception as e:
-        return (
-            f"Error loading dataset: {str(e)}",
-            "",
-            "",
-            "",
-            "",
-            "",
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        )
-
-    if test_index < 0 or test_index >= len(tests):
-        return (
-            "Error: Invalid Test Index",
-            "",
-            "",
-            "",
-            "",
-            "",
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        )
+    tests = load_tests(DATASET_PATH)
+    if not (0 <= test_index < len(tests)):
+        return "Invalid Test Index", "", "", "", "", "", 0, 0, 0, 0, 0, 0
 
     test: TestQuestion = tests[test_index]
 
-    # 1. Run Retrieval Evaluation
-    retrieval_res = evaluate_retrieval(test, vector_store)
-
-    # 2. Run Answer Quality Evaluation (LLM-as-a-Judge)
-    answer_res, generated_answer, retrieved_docs = evaluate_answer(
+    ret_eval, ans_eval, generated_answer, retrieved_docs = evaluate_test_case(
         test, vector_store
     )
 
-    # Format Retrieved Context Text for Display
     formatted_docs = "\n\n---\n\n".join(
         [
-            f"**[Chunk {i+1}]**\n{doc.get('text', 'N/A')}"
-            for i, doc in enumerate(retrieved_docs)
+            f"**[Chunk {idx+1}] (Article {doc.get('article_number', 'N/A')})**\n{doc.get('text', '')}"
+            for idx, doc in enumerate(retrieved_docs)
         ]
     )
 
@@ -77,139 +42,126 @@ def run_single_evaluation(test_index: int):
         test.ground_truth_answer,
         generated_answer,
         formatted_docs,
-        answer_res.feedback,
-        round(retrieval_res.mrr, 4),
-        round(retrieval_res.ndcg, 4),
-        round(retrieval_res.keyword_coverage, 1),
-        round(answer_res.accuracy, 2),
-        round(answer_res.completeness, 2),
-        round(answer_res.relevance, 2),
+        ans_eval.feedback,
+        round(ret_eval.mrr, 4),
+        round(ret_eval.ndcg, 4),
+        round(ret_eval.keyword_coverage, 1),
+        round(ans_eval.accuracy, 2),
+        round(ans_eval.completeness, 2),
+        round(ans_eval.relevance, 2),
     )
 
 
 def run_batch_evaluation():
-    """Run evaluation across all test cases in golden_dataset.json and return a summary dataframe."""
-    try:
-        tests = load_tests()
-    except Exception as e:
-        return pd.DataFrame([{"Error": f"Dataset failure: {str(e)}"}])
-
-    results = []
-
-    for idx, test in enumerate(tests):
-        ret_res = evaluate_retrieval(test, vector_store)
-        ans_res, gen_ans, _ = evaluate_answer(test, vector_store)
-
-        results.append(
+    tests = load_tests(DATASET_PATH)
+    records = []
+    for test in tests:
+        try:
+            ret_eval, ans_eval, _, _ = evaluate_test_case(test, vector_store)
+        except (OpenAIRateLimitError, LiteLLMRateLimitError) as exc:
+            records.append(
+                {
+                    "ID": test.id,
+                    "Query": test.query,
+                    "MRR": None,
+                    "nDCG": None,
+                    "Coverage (%)": None,
+                    "Accuracy": None,
+                    "Completeness": None,
+                    "Relevance": None,
+                    "Feedback": f"Groq rate limit reached: {exc}",
+                }
+            )
+            continue
+        records.append(
             {
                 "ID": test.id,
                 "Query": test.query,
-                "MRR": round(ret_res.mrr, 4),
-                "nDCG": round(ret_res.ndcg, 4),
-                "Coverage (%)": round(ret_res.keyword_coverage, 1),
-                "Accuracy (1-5)": ans_res.accuracy,
-                "Completeness (1-5)": ans_res.completeness,
-                "Relevance (1-5)": ans_res.relevance,
+                "MRR": round(ret_eval.mrr, 4),
+                "nDCG": round(ret_eval.ndcg, 4),
+                "Coverage (%)": round(ret_eval.keyword_coverage, 1),
+                "Accuracy": ans_eval.accuracy,
+                "Completeness": ans_eval.completeness,
+                "Relevance": ans_eval.relevance,
+                "Feedback": ans_eval.feedback,
             }
         )
 
-    df = pd.DataFrame(results)
-    return df
+    results = pd.DataFrame(records)
+    if results.empty:
+        return results
 
-
-# --- Gradio UI Layout ---
-with gr.Blocks(title="Ghana Law Companion - RAG Evaluator") as app:
-    gr.Markdown("# 🏛️ Ghana Law RAG Evaluation Dashboard")
-    gr.Markdown(
-        "Evaluate retrieval metrics (**MRR**, **nDCG**) and generation metrics "
-        "(**Accuracy**, **Completeness**, **Relevance**) using LLM-as-a-Judge."
+    numeric_columns = [
+        "MRR",
+        "nDCG",
+        "Coverage (%)",
+        "Accuracy",
+        "Completeness",
+        "Relevance",
+    ]
+    overall = {
+        "ID": "OVERALL",
+        "Query": (
+            f"Macro average across {results[numeric_columns].dropna().shape[0]} "
+            "successful test cases"
+        ),
+        "Feedback": "Dataset-level macro average; rate-limited cases are excluded.",
+    }
+    overall.update(
+        {
+            column: round(float(results[column].mean()), 4 if column in {"MRR", "nDCG"} else 2)
+            for column in numeric_columns
+        }
     )
+    overall["Coverage (%)"] = round(float(results["Coverage (%)"].mean()), 1)
+
+    return pd.concat([pd.DataFrame([overall]), results], ignore_index=True)
+
+
+with gr.Blocks(title="Ghana Law Companion - Evaluation Dashboard") as app:
+    gr.Markdown("# 🏛️ Ghana Law RAG Evaluator")
 
     with gr.Tabs():
-        # TAB 1: Individual Test Case Inspector
-        with gr.Tab("Single Test Case Evaluator"):
+        with gr.Tab("Single Case Evaluator"):
             with gr.Row():
-                test_idx_input = gr.Number(
-                    value=0,
-                    label="Test Case Index",
-                    precision=0,
-                    minimum=0,
-                    step=1,
-                )
-                run_btn = gr.Button("Evaluate Single Case", variant="primary")
+                test_idx = gr.Number(value=0, label="Test Case Index", precision=0)
+                eval_btn = gr.Button("Evaluate Case", variant="primary")
 
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown("### Input & Outputs")
-                    query_box = gr.Textbox(label="User Query", interactive=False)
-                    keywords_box = gr.Textbox(
-                        label="Target Keywords / Articles", interactive=False
-                    )
-                    gt_box = gr.Textbox(
-                        label="Ground Truth Answer", interactive=False, lines=3
-                    )
-                    gen_box = gr.Textbox(
-                        label="RAG Generated Answer", interactive=False, lines=4
-                    )
+                    q_box = gr.Textbox(label="Query", interactive=False)
+                    kw_box = gr.Textbox(label="Keywords", interactive=False)
+                    gt_box = gr.Textbox(label="Ground Truth Answer", interactive=False, lines=4)
+                    gen_box = gr.Textbox(label="Generated Answer", interactive=False, lines=5)
 
                 with gr.Column():
-                    gr.Markdown("### Evaluation Scores")
                     with gr.Row():
-                        mrr_num = gr.Number(label="MRR Score")
-                        ndcg_num = gr.Number(label="nDCG Score")
-                        cov_num = gr.Number(label="Keyword Coverage (%)")
+                        mrr_out = gr.Number(label="MRR")
+                        ndcg_out = gr.Number(label="nDCG")
+                        cov_out = gr.Number(label="Keyword Coverage (%)")
                     with gr.Row():
-                        acc_num = gr.Number(label="Accuracy (1-5)")
-                        comp_num = gr.Number(label="Completeness (1-5)")
-                        rel_num = gr.Number(label="Relevance (1-5)")
+                        acc_out = gr.Number(label="Accuracy (1-5)")
+                        comp_out = gr.Number(label="Completeness (1-5)")
+                        rel_out = gr.Number(label="Relevance (1-5)")
 
-                    feedback_box = gr.Textbox(
-                        label="LLM Judge Feedback", interactive=False, lines=3
-                    )
+                    fb_box = gr.Textbox(label="Judge Feedback", interactive=False, lines=3)
 
             with gr.Accordion("Retrieved Context Chunks", open=False):
-                context_box = gr.Markdown()
+                ctx_box = gr.Markdown()
 
-            run_btn.click(
+            eval_btn.click(
                 fn=run_single_evaluation,
-                inputs=[test_idx_input],
+                inputs=[test_idx],
                 outputs=[
-                    query_box,
-                    keywords_box,
-                    gt_box,
-                    gen_box,
-                    context_box,
-                    feedback_box,
-                    mrr_num,
-                    ndcg_num,
-                    cov_num,
-                    acc_num,
-                    comp_num,
-                    rel_num,
+                    q_box, kw_box, gt_box, gen_box, ctx_box, fb_box,
+                    mrr_out, ndcg_out, cov_out, acc_out, comp_out, rel_out
                 ],
             )
 
-        # TAB 2: Full Dataset Batch Evaluation
-        with gr.Tab("Full Dataset Batch Benchmark"):
-            batch_btn = gr.Button("Run Benchmark on Golden Dataset", variant="primary")
-            results_table = gr.Dataframe(
-                headers=[
-                    "ID",
-                    "Query",
-                    "MRR",
-                    "nDCG",
-                    "Coverage (%)",
-                    "Accuracy (1-5)",
-                    "Completeness (1-5)",
-                    "Relevance (1-5)",
-                ],
-                label="Benchmark Results Summary",
-            )
-
-            batch_btn.click(
-                fn=run_batch_evaluation,
-                outputs=[results_table],
-            )
+        with gr.Tab("Batch Benchmark"):
+            batch_btn = gr.Button("Run Benchmark Dataset", variant="primary")
+            summary_table = gr.Dataframe(label="Evaluation Metrics Summary")
+            batch_btn.click(fn=run_batch_evaluation, outputs=[summary_table])
 
 if __name__ == "__main__":
     app.launch()
