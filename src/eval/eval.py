@@ -154,12 +154,22 @@ def evaluate_answer(
             "role": "system",
             "content": (
                 "You are an expert legal evaluator for the 1992 Constitution of Ghana. "
-                "Compare the Generated Answer with the Reference Answer.\n"
-                "Rating scale:\n"
-                "- 5.0: Perfect, comprehensive, and accurate.\n"
-                "- 3.0-4.0: Acceptable with minor missing details.\n"
-                "- 1.0: Factually incorrect or completely missing core legal grounds.\n"
-                "Be fair and objective. Do not penalize formatting differences if legal points match."
+                "Compare the Generated Answer with the Reference Answer and evaluate it "
+                "only against the user's question.\n\n"
+                "Please evaluate the generated answer on three dimensions:\n"
+                "1. Accuracy: How factually correct is it compared to the reference answer? "
+                "Only give 5/5 for a perfect answer. If the answer is factually wrong, "
+                "the accuracy score must be 1/5.\n"
+                "2. Completeness: How thoroughly does it address every aspect of the "
+                "question, covering all information and legal grounds in the reference answer?\n"
+                "3. Relevance: How directly does it answer the specific question asked, "
+                "without unnecessary or unrelated information?\n\n"
+                "Use integer scores from 1 (very poor) to 5 (ideal) for each dimension. "
+                "Give detailed feedback that explains the scores, identifies missing or "
+                "incorrect legal points, and distinguishes factual errors from omissions. "
+                "Do not penalize harmless differences in wording, formatting, or organization "
+                "when the legal meaning is correct. Return only the requested feedback and "
+                "the three scores in the specified structured response format."
             ),
         },
         {
