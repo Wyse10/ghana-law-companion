@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from litellm import completion
+from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from src.config import GROQ_API_KEY
@@ -23,8 +23,8 @@ DATASET_PATH = PROJECT_ROOT / "data" / "evals" / "golden_dataset.json"
 DB_PATH = str(PROJECT_ROOT / "data" / "qdrant_db")
 
 # Keep this in sync with the model exposed by the Groq account.
-MODEL = "groq/qwen/qwen3.8-27b"
-EVAL_CONTEXT_LIMIT = int(os.getenv("EVAL_CONTEXT_LIMIT", "6"))
+MODEL = "qwen/qwen3.8-27b"
+EVAL_CONTEXT_LIMIT = int(os.getenv("EVAL_CONTEXT_LIMIT", "10"))
 
 
 @dataclass(frozen=True)
@@ -136,6 +136,7 @@ def evaluate_retrieval(
     )
 
 
+# In eval_4.py
 def evaluate_answer(
     test: TestQuestion,
     vector_store: LocalVectorStore | None = None,
@@ -143,9 +144,7 @@ def evaluate_answer(
     retrieved_docs: list[dict[str, Any]] | None = None,
 ) -> tuple[AnswerEval, str, list[dict[str, Any]]]:
     if not GROQ_API_KEY:
-        raise RuntimeError(
-            "GROQ_API_KEY is not set. Add it to the .env file before running answer evaluation."
-        )
+        raise RuntimeError("GROQ_API_KEY is not set.")
 
     if generated_answer is None or retrieved_docs is None:
         generated_answer, retrieved_docs = answer_question(test.query, vector_store)
@@ -154,8 +153,13 @@ def evaluate_answer(
         {
             "role": "system",
             "content": (
-                "Evaluate the generated legal answer against the reference answer. "
-                "Only give 5 for a perfect answer. If it is factually wrong, accuracy must be 1."
+                "You are an expert legal evaluator for the 1992 Constitution of Ghana. "
+                "Compare the Generated Answer with the Reference Answer.\n"
+                "Rating scale:\n"
+                "- 5.0: Perfect, comprehensive, and accurate.\n"
+                "- 3.0-4.0: Acceptable with minor missing details.\n"
+                "- 1.0: Factually incorrect or completely missing core legal grounds.\n"
+                "Be fair and objective. Do not penalize formatting differences if legal points match."
             ),
         },
         {
@@ -163,23 +167,27 @@ def evaluate_answer(
             "content": (
                 f"Question:\n{test.query}\n\n"
                 f"Generated Answer:\n{generated_answer}\n\n"
-                f"Reference Answer:\n{test.ground_truth_answer}\n\n"
-                "Return feedback plus accuracy, completeness, and relevance scores from 1 to 5."
+                f"Reference Answer:\n{test.ground_truth_answer}"
             ),
         },
     ]
-    response = completion(
+
+    client = OpenAI(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=GROQ_API_KEY,
+    )
+
+    response = client.chat.completions.parse(
         model=MODEL,
         messages=judge_messages,
         response_format=AnswerEval,
-        api_key=GROQ_API_KEY,
-        max_tokens=256,
+        max_tokens=min(int(os.getenv("GROQ_EVALUATION_MAX_TOKENS", "200")), 300),
     )
-    content = response.choices[0].message.content
-    if not content:
-        raise RuntimeError("The evaluation judge returned an empty response.")
-    return AnswerEval.model_validate_json(content), generated_answer, retrieved_docs
 
+    parsed_answer = response.choices[0].message.parsed
+    if parsed_answer is None:
+        raise RuntimeError("The evaluation judge returned an empty structured response.")
+    return parsed_answer, generated_answer, retrieved_docs
 
 def evaluate_test_case(
     test: TestQuestion,

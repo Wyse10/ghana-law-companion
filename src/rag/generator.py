@@ -28,26 +28,25 @@ User Question:
 
 Detailed Legal Answer:"""
 
+# In src/rag/generator.py (or generator_2.py)
 def generate_legal_answer(
     query: str,
     contexts: list[dict[str, Any]],
     model_name: str | None = None,
 ) -> str:
-    """Generate a legal response using open-source models via Groq's free cloud API."""
     if not contexts:
         return "No relevant constitutional provisions were found for your query."
 
     if not GROQ_API_KEY:
-        raise RuntimeError(
-            "GROQ_API_KEY is not set. Add it to a .env file or your environment."
-        )
+        raise RuntimeError("GROQ_API_KEY is not set.")
 
     prompt = build_rag_prompt(query, contexts)
+    
+    # Upgrade default to Llama 3.3 70B for higher legal recall
     model_name = model_name or os.getenv(
-        "GROQ_GENERATION_MODEL", "openai/gpt-oss-20b"
+        "GROQ_GENERATION_MODEL", "qwen/qwen3.8-27b"
     )
 
-    # Groq provides an OpenAI-compatible endpoint
     client = OpenAI(
         base_url="https://api.groq.com/openai/v1",
         api_key=GROQ_API_KEY,
@@ -58,15 +57,12 @@ def generate_legal_answer(
         messages=[
             {
                 "role": "system",
-                "content": "You are a knowledgeable and precise legal assistant specializing in Ghanaian law.",
+                "content": "You are an authoritative legal expert on the 1992 Constitution of Ghana. Provide exhaustive, structured, and fully-cited answers.",
             },
             {"role": "user", "content": prompt},
         ],
-        temperature=0.2,
-        max_tokens=int(os.getenv("GROQ_GENERATION_MAX_TOKENS", "1200")),
+        temperature=0.1,
+        max_tokens=min(int(os.getenv("GROQ_GENERATION_MAX_TOKENS", "800")), 900),
     )
 
-    return (
-        response.choices[0].message.content
-        or "Unable to generate an answer."
-    )
+    return response.choices[0].message.content or "Unable to generate an answer."

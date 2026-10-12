@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import gradio as gr
 import pandas as pd
-from litellm.exceptions import RateLimitError as LiteLLMRateLimitError
 from openai import RateLimitError as OpenAIRateLimitError
 
 from src.eval.eval import (
@@ -58,7 +57,7 @@ def run_batch_evaluation():
     for test in tests:
         try:
             ret_eval, ans_eval, _, _ = evaluate_test_case(test, vector_store)
-        except (OpenAIRateLimitError, LiteLLMRateLimitError) as exc:
+        except OpenAIRateLimitError as exc:
             records.append(
                 {
                     "ID": test.id,
