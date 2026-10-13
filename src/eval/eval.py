@@ -65,6 +65,13 @@ class AnswerEval(BaseModel):
     relevance: float
 
 
+def _limit_text(text: str, max_chars: int) -> str:
+    """Keep model evaluation prompts below the provider's input-token limit."""
+    if len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars]}\n[content truncated]"
+
+
 def _document_text(document: dict[str, Any]) -> str:
     return str(document.get("text", ""))
 
@@ -149,6 +156,10 @@ def evaluate_answer(
     if generated_answer is None or retrieved_docs is None:
         generated_answer, retrieved_docs = answer_question(test.query, vector_store)
 
+    evaluation_max_chars = max(
+        int(os.getenv("GROQ_EVALUATION_MAX_CHARS", "16000")),
+        1,
+    )
     judge_messages = [
         {
             "role": "system",
@@ -175,9 +186,9 @@ def evaluate_answer(
         {
             "role": "user",
             "content": (
-                f"Question:\n{test.query}\n\n"
-                f"Generated Answer:\n{generated_answer}\n\n"
-                f"Reference Answer:\n{test.ground_truth_answer}"
+                f"Question:\n{_limit_text(test.query, 2000)}\n\n"
+                f"Generated Answer:\n{_limit_text(generated_answer, evaluation_max_chars // 2)}\n\n"
+                f"Reference Answer:\n{_limit_text(test.ground_truth_answer, evaluation_max_chars // 2)}"
             ),
         },
     ]

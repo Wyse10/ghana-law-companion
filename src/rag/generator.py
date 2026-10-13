@@ -59,17 +59,28 @@ def rerank_contexts(
 
 
 def build_rag_prompt(query: str, contexts: list[dict[str, Any]]) -> str:
-    context_str = "\n\n".join(
-        [
-            (
-                f"--- Context Chunk {idx + 1} "
-                f"(Article {ctx.get('article_number', 'N/A')}, "
-                f"Chapter {ctx.get('chapter_number', 'N/A')}) ---\n"
-                f"{ctx['text']}"
-            )
-            for idx, ctx in enumerate(contexts)
-        ]
+    max_context_chars = max(
+        int(os.getenv("GROQ_CONTEXT_MAX_CHARS", "16000")),
+        1,
     )
+    context_chunks: list[str] = []
+    context_chars = 0
+    for idx, ctx in enumerate(contexts):
+        chunk = (
+            f"--- Context Chunk {idx + 1} "
+            f"(Article {ctx.get('article_number', 'N/A')}, "
+            f"Chapter {ctx.get('chapter_number', 'N/A')}) ---\n"
+            f"{ctx['text']}"
+        )
+        remaining_chars = max_context_chars - context_chars
+        if remaining_chars <= 0:
+            break
+        if len(chunk) > remaining_chars:
+            chunk = chunk[:remaining_chars]
+        context_chunks.append(chunk)
+        context_chars += len(chunk)
+
+    context_str = "\n\n".join(context_chunks)
 
     return f"""You are "Ghana Law Companion", an expert legal assistant specializing in the 1992 Constitution of the Republic of Ghana.
 
