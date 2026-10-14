@@ -8,7 +8,6 @@ dependencies = [
     "fastembed>=0.8.1",
     "langchain-text-splitters",
     "openai>=1.0.0",
-    "litellm>=1.104.2",
     "python-dotenv>=1.0.0",
     "pymupdf4llm",
     "pandas>=2.3.3",

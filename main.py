@@ -7,7 +7,7 @@ from typing import Any
 import streamlit as st
 
 from src.config import DEFAULT_MD_PATH, VECTOR_DB_PATH
-from src.rag.generator import generate_legal_answer, rerank_contexts
+from src.rag.generator import generate_legal_answer_stream, rerank_contexts
 from src.vectorstore.retriever import retrieve_relevant_context
 from src.vectorstore.store import LocalVectorStore
 
@@ -168,31 +168,40 @@ def main():
     if selected_example:
         active_query = selected_example
 
-    # Handle Search Submission
+    # Handle Search Submission:
+
     if submit_button or selected_example:
         if not active_query.strip():
             st.warning("Please enter a valid legal question.")
         else:
-            with st.spinner("Searching constitutional provisions and generating answer..."):
-                # Retrieve and generate
+            # 1. Retrieve and rerank context upfront
+            with st.spinner("Searching constitutional provisions..."):
                 contexts = retrieve_relevant_context(
                     query=active_query,
                     qdrant_client=vector_store,
                     top_k=6,
                 )
                 contexts = rerank_contexts(active_query, contexts)
-                answer = generate_legal_answer(query=active_query, contexts=contexts)
                 sources_markdown = format_sources(contexts)
 
-            # Display Legal Answer Section
+            # 2. Display Legal Answer Section
             st.markdown("---")
             st.subheader("📜 Legal Answer")
-            st.markdown(answer)
 
-            # Display Retrieved Sources in an Expander
+            # Stream the answer directly using st.write_stream()
+            from src.rag.generator import generate_legal_answer_stream
+            
+            stream_generator = generate_legal_answer_stream(
+                query=active_query, 
+                contexts=contexts
+            )
+            
+            # This renders tokens sequentially in real-time as they are yielded
+            st.write_stream(stream_generator)
+
+            # 3. Display Retrieved Sources in an Expander
             with st.expander("🔍 View Retrieved Constitutional Sources", expanded=False):
                 st.markdown(sources_markdown)
-
     # Footer Notice
     md_name = Path(DEFAULT_MD_PATH).name
     st.markdown(

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Iterator
 
-from litellm import completion
+from openai import OpenAI
+from openai import OpenAIError
 
 from src.config import GROQ_API_KEY
 
@@ -78,42 +79,60 @@ User Question:
 Detailed Legal Answer:"""
 
 
-def generate_legal_answer(
+def generate_legal_answer_stream(
     query: str,
     contexts: list[dict[str, Any]],
-    model_name: str = "groq/openai/gpt-oss-120b",
-) -> str:
-    """Generate a legal response using LiteLLM with built-in automatic failover/fallback."""
+    model_name: str = "openai/gpt-oss-120b",
+) -> Iterator[str]:
+    """Stream legal response tokens with an explicit Groq model fallback."""
     if not contexts:
-        return "No relevant constitutional provisions were found for your query."
+        yield "No relevant constitutional provisions were found for your query."
+        return
 
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY is not set. Add it to your .env file.")
 
     prompt = build_rag_prompt(query, contexts)
+    client = OpenAI(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=GROQ_API_KEY,
+    )
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a knowledgeable and precise legal assistant specializing in Ghanaian law.",
+        },
+        {"role": "user", "content": prompt},
+    ]
 
     try:
-        # LiteLLM automatically tries the primary model, and if it fails or hits rate limits,
-        # it instantly falls back to the models listed in the fallbacks array.
-        response = completion(
-            model=model_name,  # Primary model
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a knowledgeable and precise legal assistant specializing in Ghanaian law.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
             temperature=0.2,
             max_tokens=1200,
-            fallbacks=["groq/openai/gpt-oss-20b"],
-            api_key=GROQ_API_KEY,
+            stream=True,
         )
-
-        return (
-            response.choices[0].message.content
-            or "Unable to generate an answer."
-        )
-
-    except Exception as e:
-        return f"Error: All generation models and fallbacks failed. Details: {e}"
+        for chunk in response:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+        return
+    except OpenAIError as primary_error:
+        try:
+            response = client.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                messages=messages,
+                temperature=0.2,
+                max_tokens=1200,
+                stream=True,
+            )
+            for chunk in response:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+        except OpenAIError as fallback_error:
+            yield (
+                "Error: All generation models failed. "
+                f"Primary: {primary_error}; Fallback: {fallback_error}"
+            )
