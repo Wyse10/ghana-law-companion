@@ -188,16 +188,17 @@ def main():
             st.markdown("---")
             st.subheader("📜 Legal Answer")
 
-            # Stream the answer directly using st.write_stream()
-            from src.rag.generator import generate_legal_answer_stream
-            
             stream_generator = generate_legal_answer_stream(
                 query=active_query, 
                 contexts=contexts
             )
             
-            # This renders tokens sequentially in real-time as they are yielded
-            st.write_stream(stream_generator)
+            # Render tokens incrementally without st.write_stream's pandas dependency.
+            answer_placeholder = st.empty()
+            answer_parts = []
+            for chunk in stream_generator:
+                answer_parts.append(chunk)
+                answer_placeholder.markdown("".join(answer_parts))
 
             # 3. Display Retrieved Sources in an Expander
             with st.expander("🔍 View Retrieved Constitutional Sources", expanded=False):

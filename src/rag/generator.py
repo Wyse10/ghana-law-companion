@@ -121,7 +121,7 @@ def generate_legal_answer_stream(
     except OpenAIError as primary_error:
         try:
             response = client.chat.completions.create(
-                model="openai/gpt-oss-20b",
+                model="llama-3.3-70b-versatile",
                 messages=messages,
                 temperature=0.2,
                 max_tokens=1200,
