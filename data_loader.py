@@ -58,7 +58,12 @@ def load_and_index_data() -> None:
 
     print(f"\n5. Saving chunks to '{PROCESSED_CHUNKS_PATH}'...")
     with open(PROCESSED_CHUNKS_PATH, "w", encoding="utf-8") as json_file:
-        json.dump(legal_chunks, json_file, indent=2, ensure_ascii=False)
+        json.dump(
+            [chunk.model_dump(mode="json") for chunk in legal_chunks],
+            json_file,
+            indent=2,
+            ensure_ascii=False,
+        )
 
     print("\n6. Initializing local vector store...")
     init_vector_store(db_path=VECTOR_DB_PATH)

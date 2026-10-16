@@ -1,7 +1,10 @@
 from pathlib import Path
 import re
-from typing import Any
+
+from langchain_core.documents import Document
 import pymupdf4llm
+
+from src.schemas import LegalChunk
 
 
 def convert_pdf_to_markdown(pdf_path: str, markdown_path: str) -> str:
@@ -18,7 +21,7 @@ def convert_pdf_to_markdown(pdf_path: str, markdown_path: str) -> str:
     return markdown
 
 
-def convert_pdf_to_page_chunks(pdf_path: str) -> list[dict[str, Any]]:
+def convert_pdf_to_page_chunks(pdf_path: str) -> list[dict]:
     """Convert PDF to layout-aware page dictionaries (retaining page numbers)."""
     source_path = Path(pdf_path)
     if not source_path.is_file():
@@ -58,23 +61,25 @@ def extract_markdown_chapters(markdown: str) -> dict[int, str]:
 
 def format_documents_to_chunks(
     documents: list[Document],
-) -> list[dict[str, Any]]:
+) -> list[LegalChunk]:
     """Standardize LangChain Document objects into dictionary chunks matching
 
     process_constitution_rag payload format.
     """
     return [
-        {
-            "text": doc.page_content,
-            "metadata": {
-                **doc.metadata,
-                "chapter_number": "KB",
-                "chapter_title": doc.metadata.get("doc_type", "General"),
-                "article_number": "N/A",
-                "article_title": doc.metadata.get("file_name", "Untitled"),
-                "page": 1,
-                "cross_references": [],
-            },
-        }
+        LegalChunk.model_validate(
+            {
+                "text": doc.page_content,
+                "metadata": {
+                    **doc.metadata,
+                    "chapter_number": "KB",
+                    "chapter_title": doc.metadata.get("doc_type", "General"),
+                    "article_number": "N/A",
+                    "article_title": doc.metadata.get("file_name", "Untitled"),
+                    "page": 1,
+                    "cross_references": [],
+                },
+            }
+        )
         for doc in documents
     ]

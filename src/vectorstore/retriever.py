@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from fastembed import TextEmbedding
+from src.schemas import QueryRequest, RetrievedContext, VectorSearchResult
 
 MODEL_NAME = "BAAI/bge-base-en-v1.5"
 from .store import LocalVectorStore
@@ -24,18 +25,20 @@ def _terms(text: str) -> set[str]:
     }
 
 
-def _build_chunk(result: dict[str, Any]) -> dict[str, Any] | None:
-    payload = result["metadata"]
+def _build_chunk(result: VectorSearchResult) -> RetrievedContext | None:
+    payload = result.metadata.model_dump(mode="json")
     text_content = payload.get("text", "")
     if not text_content:
         return None
-    return {
-        "text": text_content,
-        "chapter_number": payload.get("chapter_number"),
-        "article_number": payload.get("article_number"),
-        "score": result["score"],
-        "metadata": payload,
-    }
+    return RetrievedContext.model_validate(
+        {
+            "text": text_content,
+            "chapter_number": payload.get("chapter_number"),
+            "article_number": payload.get("article_number"),
+            "score": result.score,
+            "metadata": payload,
+        }
+    )
 
 
 @lru_cache(maxsize=1)
@@ -53,12 +56,13 @@ def retrieve_relevant_context(
 
     chunks from Qdrant.
     """
+    request = QueryRequest(query=query)
     model = _get_embedding_model()
-    query_vector = next(model.embed([query])).tolist()
+    query_vector = next(model.embed([request.query])).tolist()
     candidate_limit = max(top_k * 5, 50)
     semantic_results = qdrant_client.query(vector=query_vector, limit=candidate_limit)
     query_terms = _terms(query)
-    candidates: dict[tuple[str, str, str], tuple[dict[str, Any], float]] = {}
+    candidates: dict[tuple[str, str, str], tuple[RetrievedContext, float]] = {}
     semantic_scores: dict[tuple[str, str], float] = {}
     top_semantic_key: tuple[str, str, str] | None = None
     top_semantic_score = 0.0
@@ -67,7 +71,8 @@ def retrieve_relevant_context(
         chunk = _build_chunk(result)
         if chunk is None:
             continue
-        payload = chunk["metadata"]
+        chunk_data = chunk.model_dump(mode="json")
+        payload = chunk_data["metadata"]
         if chapter_filter is not None and payload.get("chapter_number") != chapter_filter:
             continue
         article_key = (
@@ -75,15 +80,16 @@ def retrieve_relevant_context(
             str(payload.get("article_number", "")),
         )
         semantic_scores[article_key] = max(
-            semantic_scores.get(article_key, 0.0), float(chunk["score"])
+            semantic_scores.get(article_key, 0.0), chunk.score
         )
-        key = (*article_key, str(payload.get("text", "")))
+        key = (*article_key, chunk.text)
         if result_index == 0:
             top_semantic_key = key
-            top_semantic_score = float(chunk["score"])
-        candidates[key] = (chunk, float(chunk["score"]))
+            top_semantic_score = chunk.score
+        candidates[key] = (chunk, chunk.score)
 
-    for payload in qdrant_client.payloads:
+    for payload_model in qdrant_client.payloads:
+        payload = payload_model.model_dump(mode="json")
         if chapter_filter is not None and payload.get("chapter_number") != chapter_filter:
             continue
         text = str(payload.get("text", ""))
@@ -91,7 +97,9 @@ def retrieve_relevant_context(
         matching_terms = len(query_terms & _terms(searchable_text))
         if not matching_terms:
             continue
-        chunk = _build_chunk({"metadata": payload, "score": 0.0})
+        chunk = _build_chunk(
+            VectorSearchResult(metadata=payload_model, score=0.0)
+        )
         if chunk is None:
             continue
         article_key = (
@@ -102,12 +110,13 @@ def retrieve_relevant_context(
         semantic_score = semantic_scores.get(article_key, 0.0)
         candidates[key] = (chunk, semantic_score)
 
-    ranked: list[tuple[float, int, dict[str, Any]]] = []
+    ranked: list[tuple[float, int, RetrievedContext]] = []
     for index, (chunk, semantic_score) in enumerate(candidates.values()):
+        chunk_data = chunk.model_dump(mode="json")
         searchable_text = (
-            f"{chunk['metadata'].get('article_title', '')} {chunk['text']}"
+            f"{chunk_data['metadata'].get('article_title', '')} {chunk.text}"
         ).lower()
-        title_terms = _terms(str(chunk["metadata"].get("article_title", "")))
+        title_terms = _terms(str(chunk_data["metadata"].get("article_title", "")))
         matching_terms = len(query_terms & _terms(searchable_text))
         coverage = matching_terms / max(len(query_terms), 1)
         title_coverage = len(query_terms & title_terms) / max(len(query_terms), 1)
@@ -126,17 +135,19 @@ def retrieve_relevant_context(
         or top_semantic_key is None
         or top_semantic_key not in candidates
     ):
-        return [chunk for _, _, chunk in ranked[:top_k]]
+        return [chunk.model_dump(mode="json") for _, _, chunk in ranked[:top_k]]
 
     top_semantic_chunk = candidates[top_semantic_key][0]
     ranked = [
         item
         for item in ranked
         if (
-            str(item[2]["metadata"].get("chapter_number", "")),
-            str(item[2]["metadata"].get("article_number", "")),
-            str(item[2].get("text", "")),
+            str(item[2].metadata.chapter_number),
+            str(item[2].metadata.article_number),
+            item[2].text,
         )
         != top_semantic_key
     ]
-    return [top_semantic_chunk] + [chunk for _, _, chunk in ranked[: top_k - 1]]
+    return [top_semantic_chunk.model_dump(mode="json")] + [
+        chunk.model_dump(mode="json") for _, _, chunk in ranked[: top_k - 1]
+    ]

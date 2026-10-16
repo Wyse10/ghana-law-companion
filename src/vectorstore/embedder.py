@@ -1,6 +1,8 @@
 import json
 from fastembed import TextEmbedding
 
+from src.schemas import LegalChunk, validate_chunks
+
 MODEL_NAME = "BAAI/bge-base-en-v1.5"
 from .store import LocalVectorStore
 
@@ -11,10 +13,11 @@ def index_chunks(
     with open(json_path, "r", encoding="utf-8") as f:
         chunks = json.load(f)
 
-    documents = [c["text"] for c in chunks]
+    validated_chunks = validate_chunks(chunks)
+    documents = [chunk.text for chunk in validated_chunks]
     payloads = [
-        {**chunk["metadata"], "text": chunk["text"]}
-        for chunk in chunks
+        {**chunk.metadata.model_dump(mode="json"), "text": chunk.text}
+        for chunk in validated_chunks
     ]
 
     print(f"Embedding and indexing {len(chunks)} chunks locally (FREE)...")

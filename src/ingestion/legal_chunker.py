@@ -11,6 +11,7 @@ from .pdf_converter import (
     convert_pdf_to_markdown,
     convert_pdf_to_page_chunks,
 )
+from src.schemas import LegalChunk
 
 
 def fetch_documents(
@@ -47,7 +48,7 @@ def fetch_documents(
     return documents
 
 
-def process_constitution_rag(pdf_path: str) -> list[dict[str, Any]]:
+def process_constitution_rag(pdf_path: str) -> list[LegalChunk]:
     """Convert the Constitution and create article/clause-oriented chunks
 
     with context headers, page tracking, and structured metadata.
@@ -59,7 +60,7 @@ def process_constitution_rag(pdf_path: str) -> list[dict[str, Any]]:
     # 2. Extract layout-aware page chunks to preserve exact page numbers
     page_data = convert_pdf_to_page_chunks(pdf_path)
 
-    chunks: list[dict[str, Any]] = []
+    chunks: list[LegalChunk] = []
     current_chapter_num = "Unknown"
     current_chapter_title = "General Provisions"
     current_article: dict[str, Any] | None = None
@@ -84,7 +85,14 @@ def process_constitution_rag(pdf_path: str) -> list[dict[str, Any]]:
         body = "\n".join(current_article.pop("_body_lines")).strip()
         if body:
             current_article["text"] = current_article.pop("_header") + body
-            chunks.append(current_article.copy())
+            chunks.append(
+                LegalChunk.model_validate(
+                    {
+                        "text": current_article["text"],
+                        "metadata": current_article["metadata"],
+                    }
+                )
+            )
         current_article = None
 
     for page_info in page_data:

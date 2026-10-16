@@ -3,15 +3,13 @@ from __future__ import annotations
 import json
 import math
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from pydantic import BaseModel, Field
-
 from src.config import GROQ_API_KEY
+from src.schemas import AnswerEval, RetrievedContext, RetrievalEval, TestQuestion
 from src.rag.generator import generate_legal_answer
 from src.vectorstore.retriever import retrieve_relevant_context
 from src.vectorstore.store import LocalVectorStore
@@ -27,42 +25,13 @@ MODEL = "qwen/qwen3.8-27b"
 EVAL_CONTEXT_LIMIT = int(os.getenv("EVAL_CONTEXT_LIMIT", "10"))
 
 
-@dataclass(frozen=True)
-class TestQuestion:
-    id: str
-    query: str
-    expected_chapter: str
-    expected_articles: list[str]
-    ground_truth_answer: str
-    category: str
-
-    @property
-    def keywords(self) -> list[str]:
-        return [f"Article {article}" for article in self.expected_articles]
-
-
 def load_tests(path: str | Path = DATASET_PATH) -> list[TestQuestion]:
     """Load the golden evaluation dataset used by the Gradio dashboard."""
     dataset_path = Path(path)
     if not dataset_path.is_absolute():
         dataset_path = PROJECT_ROOT / dataset_path
     records = json.loads(dataset_path.read_text(encoding="utf-8"))
-    return [TestQuestion(**record) for record in records]
-
-
-class RetrievalEval(BaseModel):
-    mrr: float = Field(description="Mean Reciprocal Rank")
-    ndcg: float = Field(description="Normalized Discounted Cumulative Gain")
-    keywords_found: int
-    total_keywords: int
-    keyword_coverage: float
-
-
-class AnswerEval(BaseModel):
-    feedback: str
-    accuracy: float
-    completeness: float
-    relevance: float
+    return [TestQuestion.model_validate(record) for record in records]
 
 
 def _limit_text(text: str, max_chars: int) -> str:
@@ -73,7 +42,7 @@ def _limit_text(text: str, max_chars: int) -> str:
 
 
 def _document_text(document: dict[str, Any]) -> str:
-    return str(document.get("text", ""))
+    return RetrievedContext.model_validate(document).text
 
 
 def calculate_mrr(keyword: str, retrieved_docs: list[dict[str, Any]]) -> float:
