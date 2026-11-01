@@ -10,7 +10,9 @@ from src.config import (
     GROQ_API_KEY,
     GROQ_CONTEXT_MAX_CHARS,
     GROQ_FALLBACK_MODEL,
+    GROQ_MAX_TOKENS,
     GROQ_MODEL,
+    GROQ_TIMEOUT_SECONDS,
 )
 from src.schemas import LegalAnswer, QueryRequest, RetrievedContext
 
@@ -192,6 +194,7 @@ def generate_legal_answer_structured(
     client = OpenAI(
         base_url="https://api.groq.com/openai/v1",
         api_key=GROQ_API_KEY,
+        timeout=GROQ_TIMEOUT_SECONDS,
     )
     messages = [
         {
@@ -206,14 +209,14 @@ def generate_legal_answer_structured(
             ),
         },
     ]
-    last_error: OpenAIError | None = None
+    last_error: Exception | None = None
     for candidate_model in (model_name, GROQ_FALLBACK_MODEL):
         try:
             response = client.chat.completions.parse(
                 model=candidate_model,
                 messages=messages,
                 temperature=0.2,
-                max_tokens=1200,
+                max_tokens=GROQ_MAX_TOKENS,
                 response_format=LegalAnswer,
             )
             parsed = response.choices[0].message.parsed
@@ -223,7 +226,7 @@ def generate_legal_answer_structured(
                 parsed,
                 [context.model_dump(mode="json") for context in validated_contexts],
             )
-        except OpenAIError as error:
+        except (OpenAIError, RuntimeError, ValueError) as error:
             last_error = error
     raise RuntimeError(f"All generation models failed: {last_error}")
 

@@ -10,7 +10,11 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from src.config import GROQ_API_KEY
 from src.schemas import AnswerEval, RetrievedContext, RetrievalEval, TestQuestion
-from src.rag.generator import generate_legal_answer
+from src.rag.generator import (
+    generate_legal_answer,
+    rerank_contexts,
+    trim_contexts_to_budget,
+)
 from src.vectorstore.retriever import retrieve_relevant_context
 from src.vectorstore.store import LocalVectorStore
 
@@ -41,14 +45,25 @@ def _limit_text(text: str, max_chars: int) -> str:
     return f"{text[:max_chars]}\n[content truncated]"
 
 
-def _document_text(document: dict[str, Any]) -> str:
-    return RetrievedContext.model_validate(document).text
+def _is_relevant(
+    document: dict[str, Any],
+    test: TestQuestion,
+    expected_article: str,
+) -> bool:
+    context = RetrievedContext.model_validate(document)
+    return (
+        str(context.chapter_number) == str(test.expected_chapter)
+        and str(context.article_number) == str(expected_article)
+    )
 
 
-def calculate_mrr(keyword: str, retrieved_docs: list[dict[str, Any]]) -> float:
-    keyword_lower = keyword.lower()
+def calculate_mrr(
+    test: TestQuestion,
+    expected_article: str,
+    retrieved_docs: list[dict[str, Any]],
+) -> float:
     for rank, document in enumerate(retrieved_docs, start=1):
-        if keyword_lower in _document_text(document).lower():
+        if _is_relevant(document, test, expected_article):
             return 1.0 / rank
     return 0.0
 
@@ -61,11 +76,13 @@ def calculate_dcg(relevances: list[int], k: int) -> float:
 
 
 def calculate_ndcg(
-    keyword: str, retrieved_docs: list[dict[str, Any]], k: int = 10
+    test: TestQuestion,
+    expected_article: str,
+    retrieved_docs: list[dict[str, Any]],
+    k: int = 10,
 ) -> float:
-    keyword_lower = keyword.lower()
     relevances = [
-        int(keyword_lower in _document_text(document).lower())
+        int(_is_relevant(document, test, expected_article))
         for document in retrieved_docs[:k]
     ]
     dcg = calculate_dcg(relevances, k)
@@ -78,7 +95,8 @@ def fetch_context(
 ) -> list[dict[str, Any]]:
     """Retrieve local vector-store context for an evaluation query."""
     store = vector_store or LocalVectorStore(DB_PATH)
-    return retrieve_relevant_context(query=query, qdrant_client=store, top_k=10)
+    contexts = retrieve_relevant_context(query=query, qdrant_client=store, top_k=10)
+    return rerank_contexts(query, contexts)
 
 
 def answer_question(
@@ -86,7 +104,10 @@ def answer_question(
 ) -> tuple[str, list[dict[str, Any]]]:
     """Generate an answer using the same RAG path as the application."""
     contexts = fetch_context(query, vector_store)
-    return generate_legal_answer(query=query, contexts=contexts), contexts
+    return generate_legal_answer(
+        query=query,
+        contexts=trim_contexts_to_budget(contexts),
+    ), contexts
 
 
 def evaluate_retrieval(
@@ -95,9 +116,13 @@ def evaluate_retrieval(
     k: int = 10,
 ) -> RetrievalEval:
     retrieved_docs = fetch_context(test.query, vector_store)
-    mrr_scores = [calculate_mrr(keyword, retrieved_docs) for keyword in test.keywords]
+    mrr_scores = [
+        calculate_mrr(test, article, retrieved_docs)
+        for article in test.expected_articles
+    ]
     ndcg_scores = [
-        calculate_ndcg(keyword, retrieved_docs, k) for keyword in test.keywords
+        calculate_ndcg(test, article, retrieved_docs, k)
+        for article in test.expected_articles
     ]
     keywords_found = sum(score > 0 for score in mrr_scores)
     total_keywords = len(test.keywords)
@@ -185,9 +210,13 @@ def evaluate_test_case(
 ) -> tuple[RetrievalEval, AnswerEval, str, list[dict[str, Any]]]:
     """Evaluate one test case while retrieving its context only once."""
     retrieved_docs = fetch_context(test.query, vector_store)
-    mrr_scores = [calculate_mrr(keyword, retrieved_docs) for keyword in test.keywords]
+    mrr_scores = [
+        calculate_mrr(test, article, retrieved_docs)
+        for article in test.expected_articles
+    ]
     ndcg_scores = [
-        calculate_ndcg(keyword, retrieved_docs) for keyword in test.keywords
+        calculate_ndcg(test, article, retrieved_docs)
+        for article in test.expected_articles
     ]
     total_keywords = len(test.keywords)
     keywords_found = sum(score > 0 for score in mrr_scores)
@@ -201,7 +230,8 @@ def evaluate_test_case(
         ),
     )
     generated_answer = generate_legal_answer(
-        test.query, retrieved_docs[:EVAL_CONTEXT_LIMIT]
+        test.query,
+        trim_contexts_to_budget(retrieved_docs[:EVAL_CONTEXT_LIMIT]),
     )
     answer_result, _, _ = evaluate_answer(
         test,

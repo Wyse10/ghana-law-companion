@@ -20,8 +20,15 @@ requests. The Ollama installation is not required for evaluation.
 
 The application uses `openai/gpt-oss-120b` through Groq by default and falls
 back to `qwen/qwen3.8-27b`. Override these model IDs with `GROQ_MODEL` and
-`GROQ_FALLBACK_MODEL` in `.env` if your Groq account has different model
-access.
+`GROQ_FALLBACK_MODEL` in `.env` if your Groq account has different model access.
+`GROQ_TIMEOUT_SECONDS` controls the provider request timeout and defaults to
+`60`. `GROQ_MAX_TOKENS` controls the answer length and defaults to `900`.
+
+The indexed source is the Constitution of the Republic of Ghana, 1992, using
+the revised 1996 English edition stored in `data/raw/Ghana_1996-en.pdf`. The
+application is a source-grounded research aid, not a substitute for advice
+from a qualified Ghanaian lawyer and does not represent all current Ghanaian
+legislation.
 
 ## Loading the constitution data
 
@@ -38,6 +45,24 @@ After that, run the application without repeating ingestion:
 ```powershell
 uv run python main.py
 ```
+
+## Tests
+
+Run the local regression suite before using or deploying the application:
+
+```powershell
+uv run python -m unittest discover -s tests -v
+```
+
+The test suite covers chunk validation, vector-store integrity, citation
+grounding, context budgets, and metadata-aware retrieval metrics.
+
+The application loads the local embedding model when the app starts instead
+of delaying that cost until the first question. It also caches answers for
+repeated questions during the current Streamlit session and displays
+retrieval, generation, and total response timings. Structured JSON generation
+is intentionally kept non-streaming so citations can be validated before an
+answer is displayed.
 
 ## Validated project structures
 

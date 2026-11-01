@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +9,10 @@ import streamlit as st
 
 from src.config import DEFAULT_MD_PATH, VECTOR_DB_PATH
 from src.rag.generator import generate_legal_answer_structured, rerank_contexts
-from src.vectorstore.retriever import retrieve_relevant_context
+from src.vectorstore.retriever import (
+    retrieve_relevant_context,
+    warm_up_embedding_model,
+)
 from src.vectorstore.store import LocalVectorStore
 
 # Page Configuration
@@ -99,7 +103,9 @@ def load_vector_store() -> LocalVectorStore:
         st.error("GROQ_API_KEY is not set. Add it to your .env file.")
         st.stop()
 
-    return LocalVectorStore(VECTOR_DB_PATH)
+    store = LocalVectorStore(VECTOR_DB_PATH)
+    warm_up_embedding_model()
+    return store
 
 
 def format_sources(contexts: list[dict[str, Any]]) -> str:
@@ -122,6 +128,8 @@ def format_sources(contexts: list[dict[str, Any]]) -> str:
 
 def main():
     vector_store = load_vector_store()
+    if "answer_cache" not in st.session_state:
+        st.session_state.answer_cache = {}
 
     # Header Section
     st.markdown(
@@ -176,18 +184,35 @@ def main():
         else:
             # 1. Retrieve and rerank context upfront
             try:
+                normalized_query = " ".join(active_query.split()).casefold()
+                cached_result = st.session_state.answer_cache.get(normalized_query)
+                total_started = time.perf_counter()
                 with st.spinner("Searching constitutional provisions..."):
-                    contexts = retrieve_relevant_context(
-                        query=active_query,
-                        qdrant_client=vector_store,
-                        top_k=6,
-                    )
-                    contexts = rerank_contexts(active_query, contexts)
-                    legal_answer = generate_legal_answer_structured(
-                        query=active_query,
-                        contexts=contexts,
-                    )
+                    if cached_result is None:
+                        retrieval_started = time.perf_counter()
+                        contexts = retrieve_relevant_context(
+                            query=active_query,
+                            qdrant_client=vector_store,
+                            top_k=6,
+                        )
+                        contexts = rerank_contexts(active_query, contexts)
+                        retrieval_seconds = time.perf_counter() - retrieval_started
+                        generation_started = time.perf_counter()
+                        legal_answer = generate_legal_answer_structured(
+                            query=active_query,
+                            contexts=contexts,
+                        )
+                        generation_seconds = time.perf_counter() - generation_started
+                        st.session_state.answer_cache[normalized_query] = (
+                            legal_answer,
+                            contexts,
+                        )
+                    else:
+                        legal_answer, contexts = cached_result
+                        retrieval_seconds = 0.0
+                        generation_seconds = 0.0
                     sources_markdown = format_sources(contexts)
+                total_seconds = time.perf_counter() - total_started
             except (RuntimeError, ValueError) as error:
                 st.error(f"Unable to produce a grounded answer: {error}")
             else:
@@ -195,6 +220,11 @@ def main():
                 st.subheader("📜 Legal Answer")
                 st.markdown(legal_answer.answer)
                 st.markdown("**Citations:** " + ", ".join(legal_answer.citations))
+                cache_label = "cached result" if cached_result is not None else "new answer"
+                st.caption(
+                    f"{cache_label.capitalize()} | retrieval: {retrieval_seconds:.2f}s | "
+                    f"generation: {generation_seconds:.2f}s | total: {total_seconds:.2f}s"
+                )
 
                 with st.expander(
                     "🔍 View Retrieved Constitutional Sources", expanded=False

@@ -5,9 +5,10 @@ from pathlib import Path
 
 import numpy as np
 
+from src.eval.eval import calculate_mrr, calculate_ndcg
 from src.ingestion.legal_chunker import validate_constitution_chunks
 from src.rag.generator import trim_contexts_to_budget, validate_answer_citations
-from src.schemas import LegalAnswer, LegalChunk
+from src.schemas import LegalAnswer, LegalChunk, TestQuestion
 from src.vectorstore.store import LocalVectorStore
 
 
@@ -131,6 +132,58 @@ class GroundingTests(unittest.TestCase):
         validated = validate_answer_citations(answer, [context])
 
         self.assertEqual(len(validated.citations), 6)
+
+    def test_accepts_chapter_citation(self) -> None:
+        answer = LegalAnswer(answer="Answer", citations=["Chapter 5"])
+        context = {
+            "text": "Source",
+            "chapter_number": "5",
+            "article_number": "20",
+            "score": 1.0,
+            "metadata": make_chunk("20").metadata.model_copy(
+                update={"chapter_number": "5"}
+            ).model_dump(mode="json"),
+        }
+
+        validated = validate_answer_citations(answer, [context])
+
+        self.assertEqual(validated.citations, ["Chapter 5"])
+
+
+class EvaluationMetricTests(unittest.TestCase):
+    def test_retrieval_metrics_use_article_and_chapter_metadata(self) -> None:
+        test = TestQuestion(
+            id="property",
+            query="property",
+            expected_chapter="5",
+            expected_articles=["20"],
+            ground_truth_answer="answer",
+            category="rights",
+        )
+        matching_context = {
+            "text": "This text does not contain the article label.",
+            "chapter_number": "5",
+            "article_number": "20",
+            "score": 1.0,
+            "metadata": make_chunk("20").metadata.model_copy(
+                update={"chapter_number": "5"}
+            ).model_dump(mode="json"),
+        }
+        wrong_chapter_context = {
+            "text": "Article 20 appears in this text.",
+            "chapter_number": "26",
+            "article_number": "20",
+            "score": 0.9,
+            "metadata": make_chunk("20").metadata.model_dump(mode="json"),
+        }
+
+        documents = [wrong_chapter_context, matching_context]
+
+        self.assertEqual(calculate_mrr(test, "20", documents), 0.5)
+        self.assertAlmostEqual(
+            calculate_ndcg(test, "20", documents),
+            1 / 1.584962500721156,
+        )
 
 
 if __name__ == "__main__":

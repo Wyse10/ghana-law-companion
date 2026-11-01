@@ -46,6 +46,11 @@ def _get_embedding_model() -> TextEmbedding:
     return TextEmbedding(model_name=MODEL_NAME)
 
 
+def warm_up_embedding_model() -> None:
+    """Load the embedding model before the first user query."""
+    _get_embedding_model()
+
+
 def retrieve_relevant_context(
     query: str,
     qdrant_client: LocalVectorStore,
