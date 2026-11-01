@@ -18,6 +18,11 @@ lower them if the account has a smaller input-token limit.
 Batch evaluation can reuse context and the local embedding model between
 requests. The Ollama installation is not required for evaluation.
 
+The application uses `openai/gpt-oss-120b` through Groq by default and falls
+back to `qwen/qwen3.8-27b`. Override these model IDs with `GROQ_MODEL` and
+`GROQ_FALLBACK_MODEL` in `.env` if your Groq account has different model
+access.
+
 ## Loading the constitution data
 
 Run the data loader once after adding or changing the source PDF. It converts
@@ -47,7 +52,9 @@ generation boundary is validated with Pydantic models in
 - `TestQuestion`, `RetrievalEval`, and `AnswerEval` for evaluation data.
 
 The answer generator uses the OpenAI-compatible structured parsing endpoint,
-so model responses are validated before they reach the application. To access
+so model responses are validated before they reach the application. Context is
+limited by `GROQ_CONTEXT_MAX_CHARS` (default `16000`), and returned citations
+must match Articles or Chapters present in the retrieved context. To access
 the complete structured response, use
 `generate_legal_answer_structured`; the existing
 `generate_legal_answer` wrapper returns only the validated answer text for the

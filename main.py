@@ -7,7 +7,7 @@ from typing import Any
 import streamlit as st
 
 from src.config import DEFAULT_MD_PATH, VECTOR_DB_PATH
-from src.rag.generator import generate_legal_answer_stream, rerank_contexts
+from src.rag.generator import generate_legal_answer_structured, rerank_contexts
 from src.vectorstore.retriever import retrieve_relevant_context
 from src.vectorstore.store import LocalVectorStore
 
@@ -175,34 +175,31 @@ def main():
             st.warning("Please enter a valid legal question.")
         else:
             # 1. Retrieve and rerank context upfront
-            with st.spinner("Searching constitutional provisions..."):
-                contexts = retrieve_relevant_context(
-                    query=active_query,
-                    qdrant_client=vector_store,
-                    top_k=6,
-                )
-                contexts = rerank_contexts(active_query, contexts)
-                sources_markdown = format_sources(contexts)
+            try:
+                with st.spinner("Searching constitutional provisions..."):
+                    contexts = retrieve_relevant_context(
+                        query=active_query,
+                        qdrant_client=vector_store,
+                        top_k=6,
+                    )
+                    contexts = rerank_contexts(active_query, contexts)
+                    legal_answer = generate_legal_answer_structured(
+                        query=active_query,
+                        contexts=contexts,
+                    )
+                    sources_markdown = format_sources(contexts)
+            except (RuntimeError, ValueError) as error:
+                st.error(f"Unable to produce a grounded answer: {error}")
+            else:
+                st.markdown("---")
+                st.subheader("📜 Legal Answer")
+                st.markdown(legal_answer.answer)
+                st.markdown("**Citations:** " + ", ".join(legal_answer.citations))
 
-            # 2. Display Legal Answer Section
-            st.markdown("---")
-            st.subheader("📜 Legal Answer")
-
-            stream_generator = generate_legal_answer_stream(
-                query=active_query, 
-                contexts=contexts
-            )
-            
-            # Render tokens incrementally without st.write_stream's pandas dependency.
-            answer_placeholder = st.empty()
-            answer_parts = []
-            for chunk in stream_generator:
-                answer_parts.append(chunk)
-                answer_placeholder.markdown("".join(answer_parts))
-
-            # 3. Display Retrieved Sources in an Expander
-            with st.expander("🔍 View Retrieved Constitutional Sources", expanded=False):
-                st.markdown(sources_markdown)
+                with st.expander(
+                    "🔍 View Retrieved Constitutional Sources", expanded=False
+                ):
+                    st.markdown(sources_markdown)
     # Footer Notice
     md_name = Path(DEFAULT_MD_PATH).name
     st.markdown(

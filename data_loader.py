@@ -10,7 +10,11 @@ from src.config import (
     PROCESSED_CHUNKS_PATH,
     VECTOR_DB_PATH,
 )
-from src.ingestion.legal_chunker import fetch_documents, process_constitution_rag
+from src.ingestion.legal_chunker import (
+    fetch_documents,
+    process_constitution_rag,
+    validate_constitution_chunks,
+)
 from src.ingestion.pdf_converter import (
     convert_pdf_to_markdown,
     extract_markdown_chapters,
@@ -57,6 +61,7 @@ def load_and_index_data() -> None:
     print(f"Total structural chunks generated: {len(legal_chunks)}")
 
     print(f"\n5. Saving chunks to '{PROCESSED_CHUNKS_PATH}'...")
+    legal_chunks = validate_constitution_chunks(legal_chunks)
     with open(PROCESSED_CHUNKS_PATH, "w", encoding="utf-8") as json_file:
         json.dump(
             [chunk.model_dump(mode="json") for chunk in legal_chunks],

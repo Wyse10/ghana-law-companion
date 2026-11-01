@@ -6,7 +6,12 @@ from typing import Any, Iterator
 from openai import OpenAI
 from openai import OpenAIError
 
-from src.config import GROQ_API_KEY
+from src.config import (
+    GROQ_API_KEY,
+    GROQ_CONTEXT_MAX_CHARS,
+    GROQ_FALLBACK_MODEL,
+    GROQ_MODEL,
+)
 from src.schemas import LegalAnswer, QueryRequest, RetrievedContext
 
 _STOP_WORDS = {
@@ -88,14 +93,81 @@ Return the answer and cited Article/Chapter references as a structured response.
 """
 
 
+def trim_contexts_to_budget(
+    contexts: list[dict[str, Any]],
+    max_chars: int = GROQ_CONTEXT_MAX_CHARS,
+) -> list[dict[str, Any]]:
+    """Keep complete retrieved chunks within the generation context budget."""
+    if max_chars < 1:
+        raise ValueError("max_chars must be at least 1")
+
+    trimmed: list[dict[str, Any]] = []
+    characters_used = 0
+    for context in contexts:
+        validated = RetrievedContext.model_validate(context)
+        remaining = max_chars - characters_used
+        if remaining <= 0:
+            break
+        text = validated.text
+        if len(text) > remaining:
+            marker = "\n[context truncated]"
+            text = f"{text[:max(remaining - len(marker), 0)]}{marker}"
+        trimmed_context = validated.model_copy(update={"text": text})
+        trimmed.append(trimmed_context.model_dump(mode="json"))
+        characters_used += len(text)
+        if len(text) < len(validated.text):
+            break
+    return trimmed
+
+
+def validate_answer_citations(
+    answer: LegalAnswer,
+    contexts: list[dict[str, Any]],
+) -> LegalAnswer:
+    """Reject model citations that cannot be supported by retrieved context."""
+    validated_contexts = [
+        RetrievedContext.model_validate(context) for context in contexts
+    ]
+    if not answer.citations:
+        raise ValueError("The generated answer did not include any citations.")
+
+    supported_articles = {
+        f"article {context.article_number}".lower()
+        for context in validated_contexts
+        if context.article_number
+    }
+    supported_chapters = {
+        f"chapter {context.chapter_number}".lower()
+        for context in validated_contexts
+        if context.chapter_number
+    }
+    unsupported = [
+        citation
+        for citation in answer.citations
+        if not any(
+            reference in citation.lower()
+            for reference in (*supported_articles, *supported_chapters)
+        )
+    ]
+    if unsupported:
+        raise ValueError(
+            "The generated answer contains unsupported citations: "
+            + ", ".join(unsupported)
+        )
+    return answer
+
+
 def generate_legal_answer_structured(
     query: str,
     contexts: list[dict[str, Any]],
-    model_name: str = "openai/gpt-oss-120b",
+    model_name: str = GROQ_MODEL,
 ) -> LegalAnswer:
     """Generate and validate the complete structured legal answer."""
     request = QueryRequest(query=query)
-    validated_contexts = [RetrievedContext.model_validate(context) for context in contexts]
+    validated_contexts = [
+        RetrievedContext.model_validate(context)
+        for context in trim_contexts_to_budget(contexts)
+    ]
     if not validated_contexts:
         return LegalAnswer(
             answer="No relevant constitutional provisions were found for your query."
@@ -121,7 +193,7 @@ def generate_legal_answer_structured(
         },
     ]
     last_error: OpenAIError | None = None
-    for candidate_model in (model_name, "llama-3.3-70b-versatile"):
+    for candidate_model in (model_name, GROQ_FALLBACK_MODEL):
         try:
             response = client.chat.completions.parse(
                 model=candidate_model,
@@ -133,7 +205,10 @@ def generate_legal_answer_structured(
             parsed = response.choices[0].message.parsed
             if parsed is None:
                 raise RuntimeError("The generation model returned an empty structured response.")
-            return parsed
+            return validate_answer_citations(
+                parsed,
+                [context.model_dump(mode="json") for context in validated_contexts],
+            )
         except OpenAIError as error:
             last_error = error
     raise RuntimeError(f"All generation models failed: {last_error}")
@@ -142,7 +217,7 @@ def generate_legal_answer_structured(
 def generate_legal_answer(
     query: str,
     contexts: list[dict[str, Any]],
-    model_name: str = "openai/gpt-oss-120b",
+    model_name: str = GROQ_MODEL,
 ) -> str:
     """Return the validated answer text for existing UI and evaluation callers."""
     return generate_legal_answer_structured(query, contexts, model_name).answer
@@ -151,7 +226,7 @@ def generate_legal_answer(
 def generate_legal_answer_stream(
     query: str,
     contexts: list[dict[str, Any]],
-    model_name: str = "openai/gpt-oss-120b",
+    model_name: str = GROQ_MODEL,
 ) -> Iterator[str]:
     """Yield the validated structured answer as one UI-compatible chunk."""
     yield generate_legal_answer(query, contexts, model_name)

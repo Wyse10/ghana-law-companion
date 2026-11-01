@@ -20,12 +20,37 @@ class LocalVectorStore:
     def _load(self) -> None:
         vectors_path = self.db_path / "vectors.npy"
         payloads_path = self.db_path / "payloads.json"
-        if vectors_path.exists() and payloads_path.exists():
-            self.vectors = np.load(vectors_path)
-            self.payloads = [
-                LegalChunkMetadata.model_validate(payload)
-                for payload in json.loads(payloads_path.read_text(encoding="utf-8"))
-            ]
+        if vectors_path.exists() != payloads_path.exists():
+            raise ValueError(
+                f"Vector store at '{self.db_path}' is incomplete; "
+                "vectors.npy and payloads.json must be present together."
+            )
+        if not vectors_path.exists():
+            return
+
+        self.vectors = np.load(vectors_path, allow_pickle=False)
+        raw_payloads = json.loads(payloads_path.read_text(encoding="utf-8"))
+        if not isinstance(raw_payloads, list):
+            raise ValueError("Vector-store payloads must be a JSON list.")
+        self.payloads = [
+            LegalChunkMetadata.model_validate(payload) for payload in raw_payloads
+        ]
+        self._validate_integrity()
+
+    def _validate_integrity(self) -> None:
+        if self.vectors.ndim != 2:
+            raise ValueError(
+                f"Vector store vectors must be two-dimensional; got {self.vectors.ndim}."
+            )
+        if len(self.payloads) != self.vectors.shape[0]:
+            raise ValueError(
+                "Vector store is inconsistent: the number of vectors does not "
+                "match the number of payloads."
+            )
+        if self.vectors.shape[0] and self.vectors.shape[1] < 1:
+            raise ValueError("Vector store vectors must have at least one dimension.")
+        if not np.isfinite(self.vectors).all():
+            raise ValueError("Vector store contains non-finite vector values.")
 
     def reset(self) -> None:
         self.vectors = np.empty((0, 0), dtype=np.float32)
@@ -43,12 +68,23 @@ class LocalVectorStore:
             for payload in payloads
         ]
         new_vectors = np.asarray(vectors, dtype=np.float32)
+        if new_vectors.ndim != 2:
+            raise ValueError("Vectors must be a two-dimensional array.")
+        if len(validated_payloads) != new_vectors.shape[0]:
+            raise ValueError("Each vector must have a matching payload.")
+        if new_vectors.shape[0] and new_vectors.shape[1] < 1:
+            raise ValueError("Vectors must have at least one dimension.")
+        if not np.isfinite(new_vectors).all():
+            raise ValueError("Vectors must contain only finite values.")
+        if self.vectors.size and self.vectors.shape[1] != new_vectors.shape[1]:
+            raise ValueError("New vectors must match the existing vector dimension.")
         self.vectors = (
             new_vectors
             if self.vectors.size == 0
             else np.vstack((self.vectors, new_vectors))
         )
         self.payloads.extend(validated_payloads)
+        self._validate_integrity()
         np.save(self.db_path / "vectors.npy", self.vectors)
         (self.db_path / "payloads.json").write_text(
             json.dumps(
@@ -64,12 +100,20 @@ class LocalVectorStore:
         if not self.payloads:
             return []
         query_vector = np.asarray(vector, dtype=np.float32)
+        if query_vector.ndim != 1:
+            raise ValueError("Query vector must be one-dimensional.")
+        if query_vector.shape[0] != self.vectors.shape[1]:
+            raise ValueError(
+                "Query vector dimension does not match the indexed vectors."
+            )
+        if not np.isfinite(query_vector).all():
+            raise ValueError("Query vector must contain only finite values.")
         scores = self.vectors @ query_vector
         indices = np.argsort(scores)[::-1][:limit]
         return [
             VectorSearchResult(
                 score=float(scores[index]),
-                metadata=self.payloads[index],
+                metadata=self.payloads[index].model_dump(mode="python"),
             )
             for index in indices
         ]

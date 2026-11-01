@@ -48,6 +48,39 @@ def fetch_documents(
     return documents
 
 
+def validate_constitution_chunks(chunks: list[LegalChunk]) -> list[LegalChunk]:
+    """Validate extracted constitutional chunks before they are indexed."""
+    if not chunks:
+        raise ValueError("Constitution extraction produced no legal chunks.")
+
+    seen_articles: set[tuple[str, str]] = set()
+    errors: list[str] = []
+    for index, chunk in enumerate(chunks, start=1):
+        metadata = chunk.metadata
+        article_key = (metadata.chapter_number, metadata.article_number)
+        if metadata.chapter_number == "Unknown":
+            errors.append(f"chunk {index} has no recognized chapter")
+        if article_key in seen_articles:
+            errors.append(
+                f"duplicate article metadata: chapter {metadata.chapter_number}, "
+                f"article {metadata.article_number}"
+            )
+        seen_articles.add(article_key)
+        if "\ufffd" in chunk.text:
+            errors.append(f"chunk {index} contains replacement characters")
+        if len(chunk.text) > 30_000:
+            errors.append(
+                f"chunk {index} is {len(chunk.text)} characters; "
+                "split oversized articles before indexing"
+            )
+
+    if errors:
+        details = "\n".join(f"- {error}" for error in errors[:20])
+        suffix = "" if len(errors) <= 20 else f"\n- ...and {len(errors) - 20} more"
+        raise ValueError(f"Invalid constitutional chunks:\n{details}{suffix}")
+    return chunks
+
+
 def process_constitution_rag(pdf_path: str) -> list[LegalChunk]:
     """Convert the Constitution and create article/clause-oriented chunks
 
