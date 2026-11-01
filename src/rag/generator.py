@@ -132,23 +132,37 @@ def validate_answer_citations(
         raise ValueError("The generated answer did not include any citations.")
 
     supported_articles = {
-        f"article {context.article_number}".lower()
+        str(context.article_number).lower()
         for context in validated_contexts
         if context.article_number
     }
     supported_chapters = {
-        f"chapter {context.chapter_number}".lower()
+        str(context.chapter_number).lower()
         for context in validated_contexts
         if context.chapter_number
     }
-    unsupported = [
-        citation
-        for citation in answer.citations
-        if not any(
-            reference in citation.lower()
-            for reference in (*supported_articles, *supported_chapters)
+    unsupported = []
+    for citation in answer.citations:
+        citation_lower = citation.lower()
+        article_match = re.search(
+            r"\b(?:article|art\.?)\s+(\d+[a-z]?)\b",
+            citation_lower,
         )
-    ]
+        if article_match:
+            if article_match.group(1) not in supported_articles:
+                unsupported.append(citation)
+            continue
+
+        chapter_supported = any(
+            re.search(
+                rf"\bchapter\s+{re.escape(chapter)}\b",
+                citation_lower,
+            )
+            for chapter in supported_chapters
+        )
+        if not chapter_supported:
+            unsupported.append(citation)
+
     if unsupported:
         raise ValueError(
             "The generated answer contains unsupported citations: "

@@ -112,6 +112,26 @@ class GroundingTests(unittest.TestCase):
         validated = validate_answer_citations(answer, [context])
         self.assertEqual(validated.citations, ["Article 1"])
 
+    def test_accepts_abbreviated_clause_citations(self) -> None:
+        answer = LegalAnswer(
+            answer="Property may be compulsorily acquired subject to constitutional conditions.",
+            citations=[f"Art. 20({clause})" for clause in range(1, 7)],
+        )
+        property_chunk = make_chunk("20").metadata.model_copy(
+            update={"chapter_number": "5"}
+        )
+        context = {
+            "text": "Compulsory acquisition of property",
+            "chapter_number": "5",
+            "article_number": "20",
+            "score": 1.0,
+            "metadata": property_chunk.model_dump(mode="json"),
+        }
+
+        validated = validate_answer_citations(answer, [context])
+
+        self.assertEqual(len(validated.citations), 6)
+
 
 if __name__ == "__main__":
     unittest.main()
