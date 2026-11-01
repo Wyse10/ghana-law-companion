@@ -1,4 +1,6 @@
 import json
+import hashlib
+from pathlib import Path
 from fastembed import TextEmbedding
 
 from src.schemas import LegalChunk, validate_chunks
@@ -26,6 +28,11 @@ def index_chunks(
     store = LocalVectorStore(db_path)
     store.reset()
     store.add(vectors, payloads)
+    source_hash = hashlib.sha256(Path(json_path).read_bytes()).hexdigest()
+    store.write_manifest(
+        embedding_model=MODEL_NAME,
+        source_sha256=source_hash,
+    )
 
     print("Indexing complete!")
     return store

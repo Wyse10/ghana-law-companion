@@ -235,7 +235,8 @@ def main():
     st.markdown(
         f"""
         <div class="source-footer">
-            <strong>Indexed Source:</strong> <code>{md_name}</code><br>
+            <strong>Indexed Source:</strong> Constitution of Ghana, 1992
+            (revised 1996 English edition) — <code>{md_name}</code><br>
             <em>Answers are informational and grounded strictly in the indexed text; they are not a substitute for advice from a qualified lawyer.</em>
         </div>
         """,

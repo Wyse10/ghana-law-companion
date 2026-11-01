@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Iterator
 
@@ -91,7 +92,10 @@ Context:
 User Question:
 {request.query}
 
-Return the answer and cited Article/Chapter references as a structured response.
+Return ONLY a valid JSON object with exactly this shape:
+{{"answer": "grounded answer text", "citations": ["Article 20(1)", "Chapter 5"]}}
+The answer must be in English. Do not return Markdown, commentary, or any text
+before or after the JSON object.
 """
 
 
@@ -173,6 +177,27 @@ def validate_answer_citations(
     return answer
 
 
+def parse_generated_answer(content: str) -> LegalAnswer:
+    """Parse provider JSON mode output into the validated answer schema."""
+    if not content or not content.strip():
+        raise ValueError("The generation model returned empty content.")
+
+    normalized = content.strip()
+    if normalized.startswith("```"):
+        normalized = re.sub(r"^```(?:json)?\s*", "", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"\s*```$", "", normalized)
+
+    try:
+        payload = json.loads(normalized)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            "The generation model returned invalid JSON."
+        ) from error
+    if not isinstance(payload, dict):
+        raise ValueError("The generation model returned a JSON value, not an object.")
+    return LegalAnswer.model_validate(payload)
+
+
 def generate_legal_answer_structured(
     query: str,
     contexts: list[dict[str, Any]],
@@ -212,16 +237,15 @@ def generate_legal_answer_structured(
     last_error: Exception | None = None
     for candidate_model in (model_name, GROQ_FALLBACK_MODEL):
         try:
-            response = client.chat.completions.parse(
+            response = client.chat.completions.create(
                 model=candidate_model,
                 messages=messages,
                 temperature=0.2,
                 max_tokens=GROQ_MAX_TOKENS,
-                response_format=LegalAnswer,
+                response_format={"type": "json_object"},
             )
-            parsed = response.choices[0].message.parsed
-            if parsed is None:
-                raise RuntimeError("The generation model returned an empty structured response.")
+            content = response.choices[0].message.content
+            parsed = parse_generated_answer(content or "")
             return validate_answer_citations(
                 parsed,
                 [context.model_dump(mode="json") for context in validated_contexts],

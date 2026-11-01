@@ -7,7 +7,12 @@ import numpy as np
 
 from src.eval.eval import calculate_mrr, calculate_ndcg
 from src.ingestion.legal_chunker import validate_constitution_chunks
-from src.rag.generator import trim_contexts_to_budget, validate_answer_citations
+from src.rag.generator import (
+    build_rag_prompt,
+    parse_generated_answer,
+    trim_contexts_to_budget,
+    validate_answer_citations,
+)
 from src.schemas import LegalAnswer, LegalChunk, TestQuestion
 from src.vectorstore.store import LocalVectorStore
 
@@ -74,8 +79,60 @@ class VectorStoreIntegrityTests(unittest.TestCase):
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0].metadata.article_number, "1")
 
+    def test_validates_manifest_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = LocalVectorStore(directory)
+            store.add([[1.0, 0.0]], [make_chunk().metadata])
+            store.write_manifest(embedding_model="test-model")
+
+            manifest_path = Path(directory) / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["chunk_count"] = 99
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "chunk count"):
+                LocalVectorStore(directory)
+
 
 class GroundingTests(unittest.TestCase):
+    def test_builds_personal_liberty_prompt_with_json_example(self) -> None:
+        context = {
+            "text": "Personal liberty may be restricted under Article 14.",
+            "chapter_number": "5",
+            "article_number": "14",
+            "score": 1.0,
+            "metadata": make_chunk("14").metadata.model_copy(
+                update={"chapter_number": "5"}
+            ).model_dump(mode="json"),
+        }
+
+        prompt = build_rag_prompt(
+            "What are the personal liberty rights?",
+            [context],
+        )
+
+        self.assertIn(
+            '{"answer": "grounded answer text", "citations": ["Article 20(1)", "Chapter 5"]}',
+            prompt,
+        )
+
+    def test_parses_json_generation(self) -> None:
+        answer = parse_generated_answer(
+            '{"answer": "Grounded answer.", "citations": ["Article 20(1)"]}'
+        )
+        self.assertEqual(answer.answer, "Grounded answer.")
+        self.assertEqual(answer.citations, ["Article 20(1)"])
+
+    def test_parses_fenced_json_generation(self) -> None:
+        answer = parse_generated_answer(
+            '```json\n{"answer": "Grounded answer.", "citations": ["Article 20"]}\n```'
+        )
+        self.assertEqual(answer.citations, ["Article 20"])
+
+    def test_rejects_non_json_generation(self) -> None:
+        with self.assertRaisesRegex(ValueError, "invalid JSON"):
+            parse_generated_answer("依据")
+
     def test_context_budget_keeps_retrieved_context_bounded(self) -> None:
         context = {
             "text": "a" * 100,

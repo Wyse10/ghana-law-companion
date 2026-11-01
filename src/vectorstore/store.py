@@ -20,6 +20,7 @@ class LocalVectorStore:
     def _load(self) -> None:
         vectors_path = self.db_path / "vectors.npy"
         payloads_path = self.db_path / "payloads.json"
+        manifest_path = self.db_path / "manifest.json"
         if vectors_path.exists() != payloads_path.exists():
             raise ValueError(
                 f"Vector store at '{self.db_path}' is incomplete; "
@@ -36,6 +37,9 @@ class LocalVectorStore:
             LegalChunkMetadata.model_validate(payload) for payload in raw_payloads
         ]
         self._validate_integrity()
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self._validate_manifest(manifest)
 
     def _validate_integrity(self) -> None:
         if self.vectors.ndim != 2:
@@ -52,9 +56,57 @@ class LocalVectorStore:
         if not np.isfinite(self.vectors).all():
             raise ValueError("Vector store contains non-finite vector values.")
 
+    def _validate_manifest(self, manifest: Any) -> None:
+        if not isinstance(manifest, dict):
+            raise ValueError("Vector-store manifest must be a JSON object.")
+        required_fields = {
+            "schema_version",
+            "embedding_model",
+            "embedding_dimension",
+            "chunk_count",
+        }
+        missing_fields = required_fields - manifest.keys()
+        if missing_fields:
+            raise ValueError(
+                "Vector-store manifest is missing fields: "
+                + ", ".join(sorted(missing_fields))
+            )
+        if manifest["schema_version"] != 1:
+            raise ValueError("Unsupported vector-store manifest schema version.")
+        if manifest["embedding_dimension"] != self.vectors.shape[1]:
+            raise ValueError("Manifest embedding dimension does not match vectors.")
+        if manifest["chunk_count"] != len(self.payloads):
+            raise ValueError("Manifest chunk count does not match payloads.")
+
     def reset(self) -> None:
         self.vectors = np.empty((0, 0), dtype=np.float32)
         self.payloads = []
+        manifest_path = self.db_path / "manifest.json"
+        if manifest_path.exists():
+            manifest_path.unlink()
+
+    def write_manifest(
+        self,
+        *,
+        embedding_model: str,
+        source_sha256: str | None = None,
+    ) -> None:
+        """Persist metadata describing the current index build."""
+        self._validate_integrity()
+        manifest = {
+            "schema_version": 1,
+            "embedding_model": embedding_model,
+            "embedding_dimension": int(self.vectors.shape[1])
+            if self.vectors.ndim == 2 and self.vectors.shape[0]
+            else 0,
+            "chunk_count": len(self.payloads),
+        }
+        if source_sha256:
+            manifest["source_sha256"] = source_sha256
+        (self.db_path / "manifest.json").write_text(
+            json.dumps(manifest, indent=2),
+            encoding="utf-8",
+        )
 
     def add(
         self,
