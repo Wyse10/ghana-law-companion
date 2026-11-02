@@ -96,6 +96,20 @@ class VectorStoreIntegrityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "dimension"):
                 store.query([1.0], 1)
 
+    def test_query_uses_cosine_similarity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = LocalVectorStore(directory)
+            store.add([[10.0, 0.0], [1.0, 1.0]], [make_chunk("1").metadata, make_chunk("2").metadata])
+            results = store.query([1.0, 0.0], 2)
+            self.assertAlmostEqual(results[0].score, 1.0)
+            self.assertAlmostEqual(results[1].score, 2 ** -0.5)
+
+    def test_rejects_zero_length_vectors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = LocalVectorStore(directory)
+            with self.assertRaisesRegex(ValueError, "non-zero length"):
+                store.add([[0.0, 0.0]], [make_chunk().metadata])
+
     def test_persists_and_queries_valid_vectors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = LocalVectorStore(directory)

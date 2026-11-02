@@ -192,7 +192,7 @@ def main():
                         retrieval_started = time.perf_counter()
                         contexts = retrieve_relevant_context(
                             query=active_query,
-                            qdrant_client=vector_store,
+                            vector_store=vector_store,
                             top_k=6,
                         )
                         contexts = rerank_contexts(active_query, contexts)

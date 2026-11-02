@@ -95,7 +95,7 @@ def fetch_context(
 ) -> list[dict[str, Any]]:
     """Retrieve local vector-store context for an evaluation query."""
     store = vector_store or LocalVectorStore(DB_PATH)
-    contexts = retrieve_relevant_context(query=query, qdrant_client=store, top_k=10)
+    contexts = retrieve_relevant_context(query=query, vector_store=store, top_k=10)
     return rerank_contexts(query, contexts)
 
 

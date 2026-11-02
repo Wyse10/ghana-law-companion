@@ -8,7 +8,7 @@ from fastembed import TextEmbedding
 from src.schemas import QueryRequest, RetrievedContext, VectorSearchResult
 
 MODEL_NAME = "BAAI/bge-base-en-v1.5"
-from .store import LocalVectorStore
+from .protocol import VectorStore
 
 _STOP_WORDS = {
     "a", "about", "an", "and", "are", "as", "at", "be", "by", "can", "does",
@@ -53,7 +53,7 @@ def warm_up_embedding_model() -> None:
 
 def retrieve_relevant_context(
     query: str,
-    qdrant_client: LocalVectorStore,
+    vector_store: VectorStore,
     top_k: int = 5,
     chapter_filter: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -65,7 +65,7 @@ def retrieve_relevant_context(
     model = _get_embedding_model()
     query_vector = next(model.embed([request.query])).tolist()
     candidate_limit = max(top_k * 5, 50)
-    semantic_results = qdrant_client.query(vector=query_vector, limit=candidate_limit)
+    semantic_results = vector_store.query(vector=query_vector, limit=candidate_limit)
     query_terms = _terms(query)
     candidates: dict[tuple[str, str, str, str], tuple[RetrievedContext, float]] = {}
     semantic_scores: dict[tuple[str, str], float] = {}
@@ -97,7 +97,7 @@ def retrieve_relevant_context(
             top_semantic_score = chunk.score
         candidates[key] = (chunk, chunk.score)
 
-    for payload_model in qdrant_client.payloads:
+    for payload_model in vector_store.payloads:
         payload = payload_model.model_dump(mode="json")
         if chapter_filter is not None and payload.get("chapter_number") != chapter_filter:
             continue

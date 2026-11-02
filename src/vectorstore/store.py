@@ -37,6 +37,7 @@ class LocalVectorStore:
             LegalChunkMetadata.model_validate(payload) for payload in raw_payloads
         ]
         self._validate_integrity()
+        self.vectors = self._normalize_rows(self.vectors)
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self._validate_manifest(manifest)
@@ -55,6 +56,19 @@ class LocalVectorStore:
             raise ValueError("Vector store vectors must have at least one dimension.")
         if not np.isfinite(self.vectors).all():
             raise ValueError("Vector store contains non-finite vector values.")
+        if self.vectors.shape[0] and np.any(
+            np.linalg.norm(self.vectors, axis=1) <= 0
+        ):
+            raise ValueError("Vector store contains zero-length vectors.")
+
+    @staticmethod
+    def _normalize_rows(vectors: np.ndarray) -> np.ndarray:
+        if vectors.ndim != 2 or not vectors.shape[0]:
+            return vectors
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        if np.any(norms <= 0):
+            raise ValueError("Vectors must have non-zero length.")
+        return vectors / norms
 
     def _validate_manifest(self, manifest: Any) -> None:
         if not isinstance(manifest, dict):
@@ -128,6 +142,7 @@ class LocalVectorStore:
             raise ValueError("Vectors must have at least one dimension.")
         if not np.isfinite(new_vectors).all():
             raise ValueError("Vectors must contain only finite values.")
+        new_vectors = self._normalize_rows(new_vectors)
         if self.vectors.size and self.vectors.shape[1] != new_vectors.shape[1]:
             raise ValueError("New vectors must match the existing vector dimension.")
         self.vectors = (
@@ -160,6 +175,7 @@ class LocalVectorStore:
             )
         if not np.isfinite(query_vector).all():
             raise ValueError("Query vector must contain only finite values.")
+        query_vector = self._normalize_rows(query_vector.reshape(1, -1))[0]
         scores = self.vectors @ query_vector
         indices = np.argsort(scores)[::-1][:limit]
         return [

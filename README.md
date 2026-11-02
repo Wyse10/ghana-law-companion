@@ -82,7 +82,8 @@ generation boundary is validated with Pydantic models in
 - `LegalAnswer` for model output (`answer` plus `citations`).
 - `TestQuestion`, `RetrievalEval`, and `AnswerEval` for evaluation data.
 
-The answer generator uses the OpenAI-compatible structured parsing endpoint,
+The answer generator requests JSON mode from the OpenAI-compatible provider and
+manually validates the parsed response against the legal-answer schema,
 so model responses are validated before they reach the application. Context is
 limited by `GROQ_CONTEXT_MAX_CHARS` (default `16000`), and returned citations
 must match Articles or Chapters present in the retrieved context. To access
