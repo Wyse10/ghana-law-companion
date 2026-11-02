@@ -43,7 +43,8 @@ uv run python data_loader.py
 The index includes a manifest recording its embedding model, vector dimension,
 chunk count, and processed-source hash. Re-run the loader after changing the
 source PDF or embedding model; otherwise the application may be using an older
-index.
+index. The loader creates clause-level chunks for numbered constitutional
+clauses while retaining lettered paragraphs with their parent clause.
 
 After that, run the application without repeating ingestion:
 

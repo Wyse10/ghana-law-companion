@@ -6,7 +6,10 @@ from pathlib import Path
 import numpy as np
 
 from src.eval.eval import calculate_mrr, calculate_ndcg
-from src.ingestion.legal_chunker import validate_constitution_chunks
+from src.ingestion.legal_chunker import (
+    split_article_body,
+    validate_constitution_chunks,
+)
 from src.rag.generator import (
     build_rag_prompt,
     parse_generated_answer,
@@ -43,9 +46,35 @@ class IngestionValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate article metadata"):
             validate_constitution_chunks([make_chunk(), make_chunk()])
 
+    def test_accepts_distinct_article_clauses(self) -> None:
+        first = make_chunk().model_copy(
+            deep=True,
+            update={"metadata": make_chunk().metadata.model_copy(update={"clause_number": "1"})},
+        )
+        second = make_chunk().model_copy(
+            deep=True,
+            update={"metadata": make_chunk().metadata.model_copy(update={"clause_number": "2"})},
+        )
+        self.assertEqual(len(validate_constitution_chunks([first, second])), 2)
+
     def test_rejects_extraction_artifacts(self) -> None:
         with self.assertRaisesRegex(ValueError, "replacement characters"):
             validate_constitution_chunks([make_chunk(text="Bad\ufffdtext")])
+
+    def test_splits_numbered_clauses_and_keeps_lettered_paragraphs(self) -> None:
+        sections = split_article_body(
+            [
+                "Article heading",
+                "**1.** First clause.",
+                "- **a.** First paragraph.",
+                "**2.** Second clause.",
+                "- **a.** Second paragraph.",
+                "**2. a.** Continued paragraph.",
+            ]
+        )
+        self.assertEqual([clause for clause, _ in sections], [None, "1", "2"])
+        self.assertIn("First paragraph", sections[1][1])
+        self.assertIn("Second paragraph", sections[2][1])
 
 
 class VectorStoreIntegrityTests(unittest.TestCase):

@@ -57,13 +57,18 @@ def validate_constitution_chunks(chunks: list[LegalChunk]) -> list[LegalChunk]:
     errors: list[str] = []
     for index, chunk in enumerate(chunks, start=1):
         metadata = chunk.metadata
-        article_key = (metadata.chapter_number, metadata.article_number)
+        article_key = (
+            metadata.chapter_number,
+            metadata.article_number,
+            metadata.clause_number or "",
+        )
         if metadata.chapter_number == "Unknown":
             errors.append(f"chunk {index} has no recognized chapter")
         if article_key in seen_articles:
             errors.append(
                 f"duplicate article metadata: chapter {metadata.chapter_number}, "
-                f"article {metadata.article_number}"
+                f"article {metadata.article_number}, clause "
+                f"{metadata.clause_number or 'none'}"
             )
         seen_articles.add(article_key)
         if "\ufffd" in chunk.text:
@@ -79,6 +84,37 @@ def validate_constitution_chunks(chunks: list[LegalChunk]) -> list[LegalChunk]:
         suffix = "" if len(errors) <= 20 else f"\n- ...and {len(errors) - 20} more"
         raise ValueError(f"Invalid constitutional chunks:\n{details}{suffix}")
     return chunks
+
+
+def split_article_body(
+    body_lines: list[str],
+) -> list[tuple[str | None, str]]:
+    """Split an article into numbered clauses while retaining clause content."""
+    clause_pattern = re.compile(
+        r"^\s*(?:\*\*(\d+)\.\*\*\s+|(\d+)\.\s+(?![a-z]\.))",
+        re.IGNORECASE,
+    )
+    sections: list[tuple[str | None, list[str]]] = []
+    current_clause: str | None = None
+    current_lines: list[str] = []
+
+    for line in body_lines:
+        match = clause_pattern.match(line)
+        if match:
+            if current_lines:
+                sections.append((current_clause, current_lines))
+            current_clause = match.group(1) or match.group(2)
+            current_lines = [line]
+        else:
+            current_lines.append(line)
+
+    if current_lines:
+        sections.append((current_clause, current_lines))
+    return [
+        (clause_number, "\n".join(lines).strip())
+        for clause_number, lines in sections
+        if "\n".join(lines).strip()
+    ]
 
 
 def process_constitution_rag(pdf_path: str) -> list[LegalChunk]:
@@ -115,17 +151,27 @@ def process_constitution_rag(pdf_path: str) -> list[LegalChunk]:
         if current_article is None:
             return
 
-        body = "\n".join(current_article.pop("_body_lines")).strip()
+        body_lines = current_article.pop("_body_lines")
+        header = current_article.pop("_header")
+        metadata = current_article["metadata"]
+        body = "\n".join(body_lines).strip()
         if body:
-            current_article["text"] = current_article.pop("_header") + body
-            chunks.append(
-                LegalChunk.model_validate(
-                    {
-                        "text": current_article["text"],
-                        "metadata": current_article["metadata"],
-                    }
-                )
+            metadata["cross_references"] = sorted(
+                set(cross_ref_pattern.findall(body))
             )
+            for clause_number, clause_text in split_article_body(body_lines):
+                chunk_metadata = {
+                    **metadata,
+                    "clause_number": clause_number,
+                }
+                chunks.append(
+                    LegalChunk.model_validate(
+                        {
+                            "text": header + clause_text,
+                            "metadata": chunk_metadata,
+                        }
+                    )
+                )
         current_article = None
 
     for page_info in page_data:
@@ -156,7 +202,7 @@ def process_constitution_rag(pdf_path: str) -> list[LegalChunk]:
                 )
                 current_article = {
                     "_header": context_header,
-                    "_body_lines": [line_str],
+                    "_body_lines": [],
                     "metadata": {
                         "chapter_number": current_chapter_num,
                         "chapter_title": current_chapter_title,

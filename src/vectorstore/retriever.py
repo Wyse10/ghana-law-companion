@@ -67,9 +67,9 @@ def retrieve_relevant_context(
     candidate_limit = max(top_k * 5, 50)
     semantic_results = qdrant_client.query(vector=query_vector, limit=candidate_limit)
     query_terms = _terms(query)
-    candidates: dict[tuple[str, str, str], tuple[RetrievedContext, float]] = {}
+    candidates: dict[tuple[str, str, str, str], tuple[RetrievedContext, float]] = {}
     semantic_scores: dict[tuple[str, str], float] = {}
-    top_semantic_key: tuple[str, str, str] | None = None
+    top_semantic_key: tuple[str, str, str, str] | None = None
     top_semantic_score = 0.0
 
     for result_index, result in enumerate(semantic_results):
@@ -87,7 +87,11 @@ def retrieve_relevant_context(
         semantic_scores[article_key] = max(
             semantic_scores.get(article_key, 0.0), chunk.score
         )
-        key = (*article_key, chunk.text)
+        key = (
+            *article_key,
+            str(payload.get("clause_number", "")),
+            chunk.text,
+        )
         if result_index == 0:
             top_semantic_key = key
             top_semantic_score = chunk.score
@@ -111,7 +115,11 @@ def retrieve_relevant_context(
             str(payload.get("chapter_number", "")),
             str(payload.get("article_number", "")),
         )
-        key = (*article_key, text)
+        key = (
+            *article_key,
+            str(payload.get("clause_number", "")),
+            text,
+        )
         semantic_score = semantic_scores.get(article_key, 0.0)
         candidates[key] = (chunk, semantic_score)
 
@@ -149,6 +157,7 @@ def retrieve_relevant_context(
         if (
             str(item[2].metadata.chapter_number),
             str(item[2].metadata.article_number),
+            str(item[2].metadata.clause_number or ""),
             item[2].text,
         )
         != top_semantic_key

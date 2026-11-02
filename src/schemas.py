@@ -19,6 +19,7 @@ class LegalChunkMetadata(BaseModel):
     chapter_title: str
     article_number: str
     article_title: str
+    clause_number: str | None = None
     page: int = Field(ge=1)
     cross_references: list[str] = Field(default_factory=list)
     source: str
