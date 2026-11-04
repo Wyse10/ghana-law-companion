@@ -91,3 +91,58 @@ the complete structured response, use
 `generate_legal_answer_structured`; the existing
 `generate_legal_answer` wrapper returns only the validated answer text for the
 Streamlit and evaluation interfaces.
+
+## Local production infrastructure
+
+The API currently serves the verified local vector index. PostgreSQL with
+pgvector is provided as the next persistence target:
+
+```powershell
+docker compose up -d postgres
+docker compose ps
+```
+
+The database schema is initialized from `infra/postgres/init.sql`. The local
+database uses development-only credentials; use managed PostgreSQL and a
+secret manager for staging and production. The API will not switch to this
+database until migration and retrieval verification pass.
+
+After PostgreSQL is healthy, migrate the existing local index with:
+
+```powershell
+uv run python scripts/migrate_local_index.py
+```
+
+This migration is intended for Linux containers and production environments
+where the PostgreSQL driver is available. The migration records the source
+hash, replaces chunks for that exact source document, and preserves the
+embedding model and constitutional metadata.
+
+To run the API against the migrated PostgreSQL index, configure:
+
+```powershell
+$env:VECTOR_STORE_BACKEND = "postgres"
+$env:SOURCE_SHA256 = "<SHA-256 of the indexed source PDF>"
+$env:DATABASE_URL = "postgresql+psycopg://user:password@host:5432/database"
+uv run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+```
+
+The default backend remains `local` until the PostgreSQL migration has been
+verified. Production deployments should use a managed database, a connection
+pool, TLS, and secret-manager credentials.
+
+## Container deployment
+
+Build and run the API with PostgreSQL after setting the required values:
+
+```powershell
+$env:SOURCE_SHA256 = "<SHA-256 of the indexed source PDF>"
+$env:GROQ_API_KEY = "<provider key>"
+docker compose up -d --build
+docker compose ps
+```
+
+The API container runs as a non-root user and exposes port `8000`. The
+PostgreSQL password and provider key shown above are for local development
+only; production deployments must use managed secrets and a non-default
+database password.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -126,6 +127,23 @@ def format_sources(contexts: list[dict[str, Any]]) -> str:
     return "\n\n---\n\n".join(source_sections)
 
 
+def format_answer_for_display(answer: str) -> str:
+    """Add readable paragraph breaks without changing the generated answer."""
+    normalized = " ".join(answer.split())
+    normalized = re.sub(r"\s+(?=\([a-z]\)\s)", "\n\n", normalized)
+    sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", normalized)
+    paragraphs: list[str] = []
+    current: list[str] = []
+    for sentence in sentences:
+        current.append(sentence)
+        if len(current) == 3:
+            paragraphs.append(" ".join(current))
+            current = []
+    if current:
+        paragraphs.append(" ".join(current))
+    return "\n\n".join(paragraphs)
+
+
 def main():
     vector_store = load_vector_store()
     if "answer_cache" not in st.session_state:
@@ -217,9 +235,14 @@ def main():
                 st.error(f"Unable to produce a grounded answer: {error}")
             else:
                 st.markdown("---")
-                st.subheader("📜 Legal Answer")
-                st.markdown(legal_answer.answer)
-                st.markdown("**Citations:** " + ", ".join(legal_answer.citations))
+                with st.container(border=True):
+                    st.subheader("📜 Legal answer")
+                    st.markdown(format_answer_for_display(legal_answer.answer))
+
+                    st.markdown("#### Constitutional provisions cited")
+                    for citation in legal_answer.citations:
+                        st.markdown(f"- **{citation}**")
+
                 cache_label = "cached result" if cached_result is not None else "new answer"
                 st.caption(
                     f"{cache_label.capitalize()} | retrieval: {retrieval_seconds:.2f}s | "

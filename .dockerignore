@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+.env
+__pycache__
+*.py[cod]
+data/raw
+data/markdown
+data/qdrant_db
+tests
+scripts
+*.egg-info

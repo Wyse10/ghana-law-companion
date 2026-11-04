@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ghana_law
+      POSTGRES_USER: ghana_law
+      POSTGRES_PASSWORD: local-development-only
+    ports:
+      - "5432:5432"
+    volumes:
+      - ghana-law-postgres:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghana_law -d ghana_law"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      APP_ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://ghana_law:local-development-only@postgres:5432/ghana_law
+      VECTOR_STORE_BACKEND: postgres
+      SOURCE_SHA256: ${SOURCE_SHA256:?Set SOURCE_SHA256 to the indexed PDF SHA-256}
+      GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in the environment}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 45s
+      retries: 5
+
+volumes:
+  ghana-law-postgres:
