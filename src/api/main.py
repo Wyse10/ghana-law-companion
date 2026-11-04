@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Security, status
 from src.api.auth import require_api_key
 from src.api.config import Settings, get_settings
 from src.api.observability import RequestLoggingMiddleware, configure_logging
+from src.api.rate_limit import RateLimitMiddleware
 from src.api.schemas import QueryAPIRequest, QueryAPIResponse
 from src.api.services import RAGService
 from src.vectorstore.retriever import warm_up_embedding_model
@@ -20,7 +21,10 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Initialize and release application resources."""
     application.state.settings = get_settings()
     application.state.rag_service = None
+    application.state.redis = None
     yield
+    if application.state.redis is not None:
+        await application.state.redis.aclose()
 
 
 settings = get_settings()
@@ -33,6 +37,15 @@ app = FastAPI(
 )
 app.state.rag_service = None
 app.add_middleware(RequestLoggingMiddleware)
+if settings.rate_limit_enabled:
+    from redis.asyncio import Redis
+
+    app.state.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    app.add_middleware(
+        RateLimitMiddleware,
+        redis=app.state.redis,
+        limit=settings.rate_limit_per_minute,
+    )
 
 
 @app.get("/health/live", tags=["health"])

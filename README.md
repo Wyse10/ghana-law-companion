@@ -160,4 +160,8 @@ Invoke-RestMethod -Method Post `
 ```
 
 Health endpoints remain public for load balancer probes. Store the API key in
-a secret manager in production and rotate it instead of committing it.
+a secret manager in production and rotate it instead of committing it. The
+Compose deployment also enables Redis-backed fixed-window rate limiting by
+default (`RATE_LIMIT_PER_MINUTE=10`). Health endpoints are exempt; requests
+over the limit receive `429 Too Many Requests`, and Redis outages return
+`503 Service Unavailable` rather than silently disabling protection.

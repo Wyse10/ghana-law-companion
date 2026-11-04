@@ -16,6 +16,17 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ghana-law-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -28,10 +39,15 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in the environment}
       API_KEY: ${API_KEY:?Set API_KEY for REST API authentication}
       REQUIRE_API_KEY: "true"
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_PER_MINUTE: "10"
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -49,3 +65,4 @@ services:
 
 volumes:
   ghana-law-postgres:
+  ghana-law-redis:

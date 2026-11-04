@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     groq_api_key: SecretStr | None = None
     api_key: SecretStr | None = None
     require_api_key: bool = False
+    rate_limit_enabled: bool = False
+    rate_limit_per_minute: int = 10
+    redis_url: str = "redis://localhost:6379/0"
     database_url: str = (
         "postgresql+psycopg://ghana_law:local-development-only"
         "@localhost:5432/ghana_law"

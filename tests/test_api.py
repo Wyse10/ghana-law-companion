@@ -7,6 +7,7 @@ from pydantic import SecretStr
 from src.api.config import Settings
 from src.api.main import app
 from src.api.schemas import QueryAPIResponse
+from src.api.rate_limit import RateLimitMiddleware
 
 
 class FakeRAGService:
@@ -37,7 +38,15 @@ class FakeRAGService:
 
 class FastAPITests(unittest.TestCase):
     def setUp(self) -> None:
+        self.auth_settings_patcher = patch(
+            "src.api.auth.get_settings",
+            return_value=Settings(require_api_key=False, api_key=None),
+        )
+        self.auth_settings_patcher.start()
         self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        self.auth_settings_patcher.stop()
 
     def test_liveness(self) -> None:
         response = self.client.get("/health/live")
@@ -168,3 +177,48 @@ class FastAPITests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["detail"], "provider unavailable")
+
+
+class FakeRedis:
+    def __init__(self, count: int) -> None:
+        self.count = count
+
+    async def incr(self, key: str) -> int:
+        return self.count
+
+    async def expire(self, key: str, seconds: int) -> bool:
+        return True
+
+
+class RateLimitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_health_endpoint_is_exempt(self) -> None:
+        middleware = RateLimitMiddleware(
+            app,
+            redis=FakeRedis(99),
+            limit=1,
+        )
+        request = unittest.mock.Mock()
+        request.url.path = "/health/live"
+        request.client.host = "127.0.0.1"
+        async def next_handler(_):
+            return None
+
+        response = await middleware.dispatch(request, next_handler)
+
+        self.assertIsNone(response)
+
+    async def test_limit_returns_429(self) -> None:
+        middleware = RateLimitMiddleware(
+            app,
+            redis=FakeRedis(2),
+            limit=1,
+        )
+        request = unittest.mock.Mock()
+        request.url.path = "/api/v1/query"
+        request.client.host = "127.0.0.1"
+        async def next_handler(_):
+            return None
+
+        response = await middleware.dispatch(request, next_handler)
+
+        self.assertEqual(response.status_code, 429)

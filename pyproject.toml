@@ -19,6 +19,7 @@ dependencies = [
     "streamlit>=1.65.0",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.0.0",
+    "redis>=5.0.0",
     "uvicorn[standard]>=0.30.0",
 ]
 
