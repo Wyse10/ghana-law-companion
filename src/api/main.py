@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Security, status
 
 from src.api.auth import require_api_key
 from src.api.config import Settings, get_settings
+from src.api.observability import RequestLoggingMiddleware, configure_logging
 from src.api.schemas import QueryAPIRequest, QueryAPIResponse
 from src.api.services import RAGService
 from src.vectorstore.retriever import warm_up_embedding_model
@@ -23,6 +24,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 
 
 settings = get_settings()
+configure_logging()
 _rag_service_lock = Lock()
 app = FastAPI(
     title=settings.app_name,
@@ -30,6 +32,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.state.rag_service = None
+app.add_middleware(RequestLoggingMiddleware)
 
 
 @app.get("/health/live", tags=["health"])

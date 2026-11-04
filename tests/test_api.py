@@ -44,6 +44,7 @@ class FastAPITests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+        self.assertRegex(response.headers["X-Request-ID"], r"^[0-9a-f-]{36}$")
 
     def test_readiness_reports_available_index(self) -> None:
         response = self.client.get("/health/ready")
