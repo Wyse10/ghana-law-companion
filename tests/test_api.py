@@ -55,11 +55,28 @@ class FastAPITests(unittest.TestCase):
         self.assertEqual(response.json(), {"status": "ok"})
         self.assertRegex(response.headers["X-Request-ID"], r"^[0-9a-f-]{36}$")
 
+    def test_metrics_endpoint_returns_prometheus_text(self) -> None:
+        response = self.client.get("/metrics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("ghana_law_http_requests_total", response.text)
+
     def test_readiness_reports_available_index(self) -> None:
         response = self.client.get("/health/ready")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+
+    def test_browser_origins_are_not_allowed_by_default(self) -> None:
+        response = self.client.options(
+            "/api/v1/query",
+            headers={
+                "Origin": "https://untrusted.example",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+
+        self.assertNotIn("access-control-allow-origin", response.headers)
 
     def test_query_returns_validated_answer(self) -> None:
         with patch("src.api.main._get_rag_service", return_value=FakeRAGService()):

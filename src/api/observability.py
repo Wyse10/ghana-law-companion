@@ -3,9 +3,21 @@ import logging
 import time
 from uuid import uuid4
 
+from prometheus_client import Counter, Histogram, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
+REQUEST_COUNT = Counter(
+    "ghana_law_http_requests_total",
+    "Total HTTP requests.",
+    ("method", "path", "status_code"),
+)
+REQUEST_LATENCY = Histogram(
+    "ghana_law_http_request_duration_seconds",
+    "HTTP request duration in seconds.",
+    ("method", "path"),
+)
 
 
 class JsonFormatter(logging.Formatter):
@@ -43,12 +55,33 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_id = str(uuid4())
         started = time.perf_counter()
         status_code = 500
+        recorded = False
         try:
             response = await call_next(request)
             status_code = response.status_code
             response.headers["X-Request-ID"] = request_id
+            REQUEST_COUNT.labels(
+                request.method,
+                request.url.path,
+                str(status_code),
+            ).inc()
+            REQUEST_LATENCY.labels(
+                request.method,
+                request.url.path,
+            ).observe(time.perf_counter() - started)
+            recorded = True
             return response
         finally:
+            if not recorded:
+                REQUEST_COUNT.labels(
+                    request.method,
+                    request.url.path,
+                    "500",
+                ).inc()
+                REQUEST_LATENCY.labels(
+                    request.method,
+                    request.url.path,
+                ).observe(time.perf_counter() - started)
             logging.getLogger("ghana_law_companion.access").info(
                 "request completed",
                 extra={
@@ -59,3 +92,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     "request_id": request_id,
                 },
             )
+
+
+def metrics_response() -> Response:
+    """Return metrics in Prometheus text format."""
+    return Response(
+        content=generate_latest(),
+        media_type="text/plain; version=0.0.4",
+    )

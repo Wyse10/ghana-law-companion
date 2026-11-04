@@ -17,7 +17,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.limit = limit
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        if request.url.path in {"/health/live", "/health/ready"}:
+        if request.url.path in {"/health/live", "/health/ready", "/metrics"}:
             return await call_next(request)
 
         client = request.client.host if request.client else "unknown"

@@ -36,11 +36,16 @@ class LocalVectorStore:
         self.payloads = [
             LegalChunkMetadata.model_validate(payload) for payload in raw_payloads
         ]
+
         self._validate_integrity()
         self.vectors = self._normalize_rows(self.vectors)
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self._validate_manifest(manifest)
+
+    def close(self) -> None:
+        """Release resources owned by the vector store."""
+        return None
 
     def _validate_integrity(self) -> None:
         if self.vectors.ndim != 2:

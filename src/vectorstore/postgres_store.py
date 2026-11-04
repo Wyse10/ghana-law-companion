@@ -1,28 +1,35 @@
 from __future__ import annotations
 
-from typing import Any
-
 from src.schemas import LegalChunkMetadata, VectorSearchResult
 
 
 class PostgresVectorStore:
     """PostgreSQL/pgvector implementation of the vector-store protocol."""
 
-    def __init__(self, database_url: str, source_sha256: str) -> None:
+    def __init__(
+        self,
+        database_url: str,
+        source_sha256: str,
+        min_size: int = 1,
+        max_size: int = 10,
+    ) -> None:
+        from psycopg.rows import dict_row
+        from psycopg_pool import ConnectionPool
+
         self._database_url = database_url.replace(
             "postgresql+psycopg://", "postgresql://"
         )
         self._source_sha256 = source_sha256
+        self._pool = ConnectionPool(
+            conninfo=self._database_url,
+            kwargs={"row_factory": dict_row},
+            min_size=min_size,
+            max_size=max_size,
+        )
         self.payloads = self._load_payloads()
 
-    def _connect(self):
-        import psycopg
-        from psycopg.rows import dict_row
-
-        return psycopg.connect(self._database_url, row_factory=dict_row)
-
     def _document_id(self) -> int:
-        with self._connect() as connection:
+        with self._pool.connection() as connection:
             row = connection.execute(
                 "SELECT id FROM documents WHERE source_sha256 = %s",
                 (self._source_sha256,),
@@ -33,7 +40,7 @@ class PostgresVectorStore:
 
     def _load_payloads(self) -> list[LegalChunkMetadata]:
         document_id = self._document_id()
-        with self._connect() as connection:
+        with self._pool.connection() as connection:
             rows = connection.execute(
                 """
                 SELECT chapter_number, chapter_title, article_number,
@@ -61,7 +68,7 @@ class PostgresVectorStore:
             raise ValueError("limit must be at least 1")
         document_id = self._document_id()
         vector_literal = "[" + ",".join(str(value) for value in vector) + "]"
-        with self._connect() as connection:
+        with self._pool.connection() as connection:
             rows = connection.execute(
                 """
                 SELECT chapter_number, chapter_title, article_number,
@@ -90,5 +97,5 @@ class PostgresVectorStore:
         ]
 
     def close(self) -> None:
-        """Close the database connection."""
-        return None
+        """Close all pooled database connections."""
+        self._pool.close()

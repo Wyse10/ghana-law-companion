@@ -4,10 +4,15 @@ from threading import Lock
 from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Security, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.auth import require_api_key
 from src.api.config import Settings, get_settings
-from src.api.observability import RequestLoggingMiddleware, configure_logging
+from src.api.observability import (
+    RequestLoggingMiddleware,
+    configure_logging,
+    metrics_response,
+)
 from src.api.rate_limit import RateLimitMiddleware
 from src.api.schemas import QueryAPIRequest, QueryAPIResponse
 from src.api.services import RAGService
@@ -23,6 +28,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     application.state.rag_service = None
     application.state.redis = None
     yield
+    if application.state.rag_service is not None:
+        application.state.rag_service.close()
     if application.state.redis is not None:
         await application.state.redis.aclose()
 
@@ -37,6 +44,19 @@ app = FastAPI(
 )
 app.state.rag_service = None
 app.add_middleware(RequestLoggingMiddleware)
+cors_origins = [
+    origin.strip()
+    for origin in settings.cors_origins.split(",")
+    if origin.strip()
+]
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "X-API-Key", "X-Request-ID"],
+    )
 if settings.rate_limit_enabled:
     from redis.asyncio import Redis
 
@@ -52,6 +72,12 @@ if settings.rate_limit_enabled:
 def liveness() -> dict[str, str]:
     """Report whether the API process is running."""
     return {"status": "ok"}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    """Expose Prometheus metrics for internal monitoring."""
+    return metrics_response()
 
 
 @app.get("/health/ready", tags=["health"])
@@ -94,6 +120,8 @@ def _get_rag_service() -> RAGService:
             store = PostgresVectorStore(
                 settings.database_url,
                 settings.source_sha256,
+                min_size=settings.database_pool_min_size,
+                max_size=settings.database_pool_max_size,
             )
         else:
             vector_db_path = Path(settings.vector_db_path)

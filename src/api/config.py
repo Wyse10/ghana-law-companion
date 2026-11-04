@@ -17,11 +17,14 @@ class Settings(BaseSettings):
     require_api_key: bool = False
     rate_limit_enabled: bool = False
     rate_limit_per_minute: int = 10
+    cors_origins: str = ""
     redis_url: str = "redis://localhost:6379/0"
     database_url: str = (
         "postgresql+psycopg://ghana_law:local-development-only"
         "@localhost:5432/ghana_law"
     )
+    database_pool_min_size: int = 1
+    database_pool_max_size: int = 10
     vector_store_backend: Literal["local", "postgres"] = "local"
     source_sha256: str | None = None
     vector_db_path: str = str(

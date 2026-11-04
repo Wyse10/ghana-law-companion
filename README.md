@@ -70,6 +70,14 @@ retrieval, generation, and total response timings. Structured JSON generation
 is intentionally kept non-streaming so citations can be validated before an
 answer is displayed.
 
+## Continuous integration
+
+Every push to `main` and every pull request runs the regression suite, checks
+the Compose configuration with non-production placeholder values, and builds
+the API image. CI does not deploy or access production secrets. Production
+deployment should be a separate approved workflow that promotes the exact
+image digest built by CI.
+
 ## Validated project structures
 
 All data crossing an ingestion, retrieval, vector-store, evaluation, or
@@ -146,7 +154,9 @@ docker compose ps
 The API container runs as a non-root user and exposes port `8000`. The
 PostgreSQL password and provider key shown above are for local development
 only; production deployments must use managed secrets and a non-default
-database password.
+database password. PostgreSQL retrieval uses a bounded connection pool
+(`DATABASE_POOL_MIN_SIZE=1`, `DATABASE_POOL_MAX_SIZE=10`) that is closed during
+API shutdown.
 
 The query endpoint requires the `X-API-Key` header when
 `REQUIRE_API_KEY=true`:
@@ -164,4 +174,33 @@ a secret manager in production and rotate it instead of committing it. The
 Compose deployment also enables Redis-backed fixed-window rate limiting by
 default (`RATE_LIMIT_PER_MINUTE=10`). Health endpoints are exempt; requests
 over the limit receive `429 Too Many Requests`, and Redis outages return
-`503 Service Unavailable` rather than silently disabling protection.
+`503 Service Unavailable` rather than silently disabling protection. CORS is
+disabled by default (`CORS_ORIGINS=""`); set it to a comma-separated list of
+trusted frontend origins before enabling browser access.
+Prometheus-compatible metrics are available at `/metrics`; keep that endpoint
+private to your monitoring network or protect it at the reverse proxy.
+
+## PostgreSQL backup and restore verification
+
+Back up the PostgreSQL database to a local, ignored `backups` directory:
+
+```powershell
+.\scripts\backup_postgres.ps1
+```
+
+The script creates a compressed custom-format dump and a SHA-256 checksum.
+Store both files in durable, encrypted object storage in production; do not
+rely on the Docker volume or the application host as the only copy.
+
+Verify a dump by restoring it into a temporary database and checking that the
+document and chunk tables can be read:
+
+```powershell
+.\scripts\verify_postgres_backup.ps1 `
+  -BackupPath .\backups\ghana-law-YYYYMMDD-HHMMSS.dump
+```
+
+Run backup and restore verification on a schedule, retain multiple recovery
+points, and record the last successful restore test. A production restore
+should be performed against a new managed database, followed by application
+readiness and retrieval checks before traffic is switched.

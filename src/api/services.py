@@ -53,3 +53,7 @@ class RAGService:
                 total_ms=round((perf_counter() - started) * 1000, 2),
             ),
         )
+
+    def close(self) -> None:
+        """Release resources owned by the vector store."""
+        self.vector_store.close()
