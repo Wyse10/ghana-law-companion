@@ -138,6 +138,7 @@ Build and run the API with PostgreSQL after setting the required values:
 ```powershell
 $env:SOURCE_SHA256 = "<SHA-256 of the indexed source PDF>"
 $env:GROQ_API_KEY = "<provider key>"
+$env:API_KEY = "<long random API key>"
 docker compose up -d --build
 docker compose ps
 ```
@@ -146,3 +147,17 @@ The API container runs as a non-root user and exposes port `8000`. The
 PostgreSQL password and provider key shown above are for local development
 only; production deployments must use managed secrets and a non-default
 database password.
+
+The query endpoint requires the `X-API-Key` header when
+`REQUIRE_API_KEY=true`:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:8000/api/v1/query `
+  -Headers @{ "X-API-Key" = $env:API_KEY } `
+  -ContentType "application/json" `
+  -Body '{"query":"What protects personal liberty?","top_k":5}'
+```
+
+Health endpoints remain public for load balancer probes. Store the API key in
+a secret manager in production and rotate it instead of committing it.

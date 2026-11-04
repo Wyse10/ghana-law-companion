@@ -2,7 +2,9 @@ import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
+from src.api.config import Settings
 from src.api.main import app
 from src.api.schemas import QueryAPIResponse
 
@@ -61,6 +63,68 @@ class FastAPITests(unittest.TestCase):
         self.assertEqual(payload["answer"]["citations"], ["Article 14"])
         self.assertEqual(payload["sources"][0]["article_number"], "14")
         self.assertEqual(payload["request_id"], "test-request")
+
+    def test_health_endpoints_remain_public_when_authentication_enabled(self) -> None:
+        with patch(
+            "src.api.auth.get_settings",
+            return_value=Settings(
+                require_api_key=True,
+                api_key=SecretStr("test-key"),
+            ),
+        ):
+            response = self.client.get("/health/live")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_query_rejects_missing_api_key(self) -> None:
+        with patch(
+            "src.api.auth.get_settings",
+            return_value=Settings(
+                require_api_key=True,
+                api_key=SecretStr("test-key"),
+            ),
+        ):
+            response = self.client.post(
+                "/api/v1/query",
+                json={"query": "What protects personal liberty?"},
+            )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_query_rejects_invalid_api_key(self) -> None:
+        with patch(
+            "src.api.auth.get_settings",
+            return_value=Settings(
+                require_api_key=True,
+                api_key=SecretStr("test-key"),
+            ),
+        ):
+            response = self.client.post(
+                "/api/v1/query",
+                headers={"X-API-Key": "wrong-key"},
+                json={"query": "What protects personal liberty?"},
+            )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_query_accepts_valid_api_key(self) -> None:
+        with (
+            patch(
+                "src.api.auth.get_settings",
+                return_value=Settings(
+                    require_api_key=True,
+                    api_key=SecretStr("test-key"),
+                ),
+            ),
+            patch("src.api.main._get_rag_service", return_value=FakeRAGService()),
+        ):
+            response = self.client.post(
+                "/api/v1/query",
+                headers={"X-API-Key": "test-key"},
+                json={"query": "What protects personal liberty?"},
+            )
+
+        self.assertEqual(response.status_code, 200)
 
     def test_query_rejects_empty_query(self) -> None:
         response = self.client.post("/api/v1/query", json={"query": "   "})

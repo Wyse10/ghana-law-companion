@@ -3,8 +3,9 @@ from pathlib import Path
 from threading import Lock
 from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Security, status
 
+from src.api.auth import require_api_key
 from src.api.config import Settings, get_settings
 from src.api.schemas import QueryAPIRequest, QueryAPIResponse
 from src.api.services import RAGService
@@ -99,7 +100,10 @@ def _get_rag_service() -> RAGService:
     status_code=status.HTTP_200_OK,
     tags=["query"],
 )
-def query(request: QueryAPIRequest) -> QueryAPIResponse:
+def query(
+    request: QueryAPIRequest,
+    _: None = Security(require_api_key),
+) -> QueryAPIResponse:
     """Answer a question using retrieved constitutional context."""
     try:
         return _get_rag_service().answer(request)

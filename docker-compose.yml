@@ -26,6 +26,8 @@ services:
       VECTOR_STORE_BACKEND: postgres
       SOURCE_SHA256: ${SOURCE_SHA256:?Set SOURCE_SHA256 to the indexed PDF SHA-256}
       GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in the environment}
+      API_KEY: ${API_KEY:?Set API_KEY for REST API authentication}
+      REQUIRE_API_KEY: "true"
     ports:
       - "8000:8000"
     depends_on:
