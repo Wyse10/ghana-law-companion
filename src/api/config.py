@@ -12,8 +12,10 @@ class Settings(BaseSettings):
     app_name: str = "Ghana Law Companion API"
     app_version: str = "0.1.0"
     app_environment: str = "development"
+    api_docs_enabled: bool = True
     groq_api_key: SecretStr | None = None
     api_key: SecretStr | None = None
+    api_keys: str = ""
     require_api_key: bool = False
     rate_limit_enabled: bool = False
     rate_limit_per_minute: int = 10

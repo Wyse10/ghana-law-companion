@@ -1,0 +1,39 @@
+import { Body, Controller, Post } from "@nestjs/common";
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from "class-validator";
+import { QueryRequest, QueryService } from "./query.service";
+
+export class QueryDto implements QueryRequest {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10_000)
+  query!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  top_k?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  chapter?: string | null;
+}
+
+@Controller()
+export class QueryController {
+  constructor(private readonly queryService: QueryService) {}
+
+  @Post("query")
+  query(@Body() request: QueryDto) {
+    return this.queryService.forward(request);
+  }
+}

@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from redis.exceptions import RedisError
 
 from src.api.config import Settings
 from src.api.main import app
@@ -55,17 +56,64 @@ class FastAPITests(unittest.TestCase):
         self.assertEqual(response.json(), {"status": "ok"})
         self.assertRegex(response.headers["X-Request-ID"], r"^[0-9a-f-]{36}$")
 
+    def test_security_headers_are_present(self) -> None:
+        response = self.client.get("/health/live")
+
+        self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(response.headers["X-Frame-Options"], "DENY")
+        self.assertEqual(response.headers["Referrer-Policy"], "no-referrer")
+        self.assertEqual(
+            response.headers["Permissions-Policy"],
+            "geolocation=(), microphone=(), camera=()",
+        )
+        self.assertNotIn("Strict-Transport-Security", response.headers)
+
     def test_metrics_endpoint_returns_prometheus_text(self) -> None:
         response = self.client.get("/metrics")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("ghana_law_http_requests_total", response.text)
 
+    def test_api_documentation_is_available_in_development(self) -> None:
+        response = self.client.get("/docs")
+
+        self.assertEqual(response.status_code, 200)
+
     def test_readiness_reports_available_index(self) -> None:
         response = self.client.get("/health/ready")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+
+    def test_readiness_reports_postgres_failure(self) -> None:
+        with patch(
+            "src.api.main.get_settings",
+            return_value=Settings(
+                vector_store_backend="postgres",
+                source_sha256="a" * 64,
+                database_url="postgresql+psycopg://invalid",
+            ),
+        ):
+            response = self.client.get("/health/ready")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "PostgreSQL is unavailable.")
+
+    def test_readiness_reports_redis_failure(self) -> None:
+        with (
+            patch(
+                "src.api.main.get_settings",
+                return_value=Settings(
+                    rate_limit_enabled=True,
+                    redis_url="redis://127.0.0.1:1/0",
+                ),
+            ),
+            patch("src.api.main.Redis.ping", side_effect=RedisError("unavailable")),
+        ):
+            response = self.client.get("/health/ready")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "Redis is unavailable.")
 
     def test_browser_origins_are_not_allowed_by_default(self) -> None:
         response = self.client.options(
@@ -148,6 +196,25 @@ class FastAPITests(unittest.TestCase):
             response = self.client.post(
                 "/api/v1/query",
                 headers={"X-API-Key": "test-key"},
+                json={"query": "What protects personal liberty?"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_query_accepts_any_rotating_api_key(self) -> None:
+        with (
+            patch(
+                "src.api.auth.get_settings",
+                return_value=Settings(
+                    require_api_key=True,
+                    api_keys="old-key, next-key",
+                ),
+            ),
+            patch("src.api.main._get_rag_service", return_value=FakeRAGService()),
+        ):
+            response = self.client.post(
+                "/api/v1/query",
+                headers={"X-API-Key": "next-key"},
                 json={"query": "What protects personal liberty?"},
             )
 

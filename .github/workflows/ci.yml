@@ -40,5 +40,34 @@ jobs:
       - name: Validate Compose configuration
         run: docker compose config --quiet
 
+      - name: Validate production Compose configuration
+        env:
+          POSTGRES_DB: ghana_law
+          POSTGRES_USER: ghana_law
+          POSTGRES_PASSWORD: ci-password
+          DATABASE_URL: postgresql+psycopg://ghana_law:ci-password@postgres:5432/ghana_law
+        run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+
+      - name: Validate Caddy configuration
+        run: |
+          docker run --rm \
+            -e API_DOMAIN=api.example.com \
+            -v "$PWD/infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile
+
       - name: Build API image
         run: docker build --file Dockerfile --tag ghana-law-companion-api:ci .
+
+      - name: Build NestJS BFF
+        working-directory: nestjs
+        run: |
+          npm ci
+          npm run build
+
+      - name: Run Compose smoke test
+        run: |
+          trap 'docker compose down -v' EXIT
+          docker compose up -d --build --wait
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8000/health/live)" = "200"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8000/health/ready)" = "200"

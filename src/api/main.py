@@ -5,11 +5,14 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Security, status
 from fastapi.middleware.cors import CORSMiddleware
+from redis import Redis
+from redis.exceptions import RedisError
 
 from src.api.auth import require_api_key
 from src.api.config import Settings, get_settings
 from src.api.observability import (
     RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
     configure_logging,
     metrics_response,
 )
@@ -41,9 +44,13 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     lifespan=lifespan,
+    docs_url="/docs" if settings.api_docs_enabled else None,
+    redoc_url="/redoc" if settings.api_docs_enabled else None,
+    openapi_url="/openapi.json" if settings.api_docs_enabled else None,
 )
 app.state.rag_service = None
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 cors_origins = [
     origin.strip()
     for origin in settings.cors_origins.split(",")
@@ -82,7 +89,7 @@ def metrics():
 
 @app.get("/health/ready", tags=["health"])
 def readiness() -> dict[str, str]:
-    """Report whether the API has its required local index."""
+    """Report whether the API and its required dependencies are usable."""
     loaded_settings: Settings = get_settings()
     if loaded_settings.vector_store_backend == "postgres":
         if not loaded_settings.source_sha256:
@@ -90,11 +97,39 @@ def readiness() -> dict[str, str]:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="SOURCE_SHA256 is required for PostgreSQL retrieval.",
             )
+        try:
+            import psycopg
+
+            database_url = loaded_settings.database_url.replace(
+                "postgresql+psycopg://", "postgresql://"
+            )
+            with psycopg.connect(database_url, connect_timeout=3) as connection:
+                connection.execute("SELECT 1")
+        except (psycopg.Error, ValueError) as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="PostgreSQL is unavailable.",
+            ) from error
     elif not (Path(loaded_settings.vector_db_path) / "vectors.npy").exists():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The vector store is not available.",
         )
+    if loaded_settings.rate_limit_enabled:
+        redis = Redis.from_url(
+            loaded_settings.redis_url,
+            socket_connect_timeout=3,
+            socket_timeout=3,
+        )
+        try:
+            redis.ping()
+        except RedisError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Redis is unavailable.",
+            ) from error
+        finally:
+            redis.close()
     return {
         "status": "ok",
         "environment": loaded_settings.app_environment,

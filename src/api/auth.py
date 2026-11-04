@@ -13,19 +13,25 @@ def require_api_key(
 ) -> None:
     """Require the configured API key when authentication is enabled."""
     settings = get_settings()
-    expected_key = settings.api_key
-    authentication_enabled = settings.require_api_key or expected_key is not None
+    configured_keys = [
+        key.strip()
+        for key in settings.api_keys.split(",")
+        if key.strip()
+    ]
+    if not configured_keys and settings.api_key is not None:
+        configured_keys = [settings.api_key.get_secret_value()]
+    authentication_enabled = settings.require_api_key or bool(configured_keys)
 
     if not authentication_enabled:
         return
-    if expected_key is None:
+    if not configured_keys:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="API authentication is not configured.",
         )
-    if provided_key is None or not hmac.compare_digest(
-        provided_key,
-        expected_key.get_secret_value(),
+    if provided_key is None or not any(
+        hmac.compare_digest(provided_key, expected_key)
+        for expected_key in configured_keys
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

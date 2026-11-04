@@ -1,0 +1,21 @@
+{$API_DOMAIN} {
+    encode gzip
+    request_body {
+        max_size 64KB
+    }
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    @metrics path /metrics
+    respond @metrics 404
+
+    @health path /health/live /health/ready
+    reverse_proxy @health api:8000
+
+    @bff path /api/query /api/health/*
+    reverse_proxy @bff nestjs:3000
+
+    @api path /api/v1/*
+    reverse_proxy @api api:8000
+
+    respond 404
+}

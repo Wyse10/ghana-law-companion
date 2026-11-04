@@ -1,0 +1,53 @@
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+
+export interface QueryRequest {
+  query: string;
+  top_k?: number;
+  chapter?: string | null;
+}
+
+@Injectable()
+export class QueryService {
+  private readonly fastApiUrl = process.env.FASTAPI_URL ?? "http://api:8000";
+  private readonly apiKey = process.env.API_KEY ?? "";
+
+  async forward(request: QueryRequest): Promise<unknown> {
+    if (!request.query?.trim()) {
+      throw new BadRequestException("query must not be empty");
+    }
+
+    try {
+      const response = await fetch(`${this.fastApiUrl}/api/v1/query`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": this.apiKey,
+        },
+        body: JSON.stringify(request),
+        signal: AbortSignal.timeout(65_000),
+      });
+      const payload: unknown = await response.json();
+
+      if (!response.ok) {
+        throw new BadGatewayException(payload);
+      }
+      return payload;
+    } catch (error) {
+      if (
+        error instanceof BadGatewayException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new ServiceUnavailableException(
+        "FastAPI is unavailable.",
+        error instanceof Error ? error.message : undefined,
+      );
+    }
+  }
+}

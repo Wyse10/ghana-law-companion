@@ -3,7 +3,7 @@
 ## Evaluation
 
 The evaluator uses the Groq judge model `qwen3.8-27b`. Ensure
-`GROQ_API_KEY` is set in `.env`, then start the dashboard:
+`GROQ_API_KEY` is set in `.env`, then run the evaluator:
 
 ```powershell
 uv run python evaluator.py
@@ -46,11 +46,7 @@ source PDF or embedding model; otherwise the application may be using an older
 index. The loader creates clause-level chunks for numbered constitutional
 clauses while retaining lettered paragraphs with their parent clause.
 
-After that, run the application without repeating ingestion:
-
-```powershell
-uv run python main.py
-```
+After ingestion, run the FastAPI API with Docker Compose as described below.
 
 ## Tests
 
@@ -63,20 +59,19 @@ uv run python -m unittest discover -s tests -v
 The test suite covers chunk validation, vector-store integrity, citation
 grounding, context budgets, and metadata-aware retrieval metrics.
 
-The application loads the local embedding model when the app starts instead
-of delaying that cost until the first question. It also caches answers for
-repeated questions during the current Streamlit session and displays
-retrieval, generation, and total response timings. Structured JSON generation
-is intentionally kept non-streaming so citations can be validated before an
-answer is displayed.
+The FastAPI service loads the embedding model when the first query arrives and
+returns retrieval, generation, and total response timings. Structured JSON
+generation is intentionally kept non-streaming so citations can be validated
+before an answer is returned.
 
 ## Continuous integration
 
 Every push to `main` and every pull request runs the regression suite, checks
-the Compose configuration with non-production placeholder values, and builds
-the API image. CI does not deploy or access production secrets. Production
-deployment should be a separate approved workflow that promotes the exact
-image digest built by CI.
+the development and production Compose configurations, validates the Caddy
+edge configuration, builds the API image, and runs a Compose smoke test
+against live PostgreSQL, Redis, and API containers. CI does not deploy or
+access production secrets. Production deployment should be a separate approved
+workflow that promotes the exact image digest built by CI.
 
 ## Validated project structures
 
@@ -97,8 +92,29 @@ limited by `GROQ_CONTEXT_MAX_CHARS` (default `16000`), and returned citations
 must match Articles or Chapters present in the retrieved context. To access
 the complete structured response, use
 `generate_legal_answer_structured`; the existing
-`generate_legal_answer` wrapper returns only the validated answer text for the
-Streamlit and evaluation interfaces.
+`generate_legal_answer` wrapper returns only the validated answer text for
+evaluation and internal library callers.
+
+## NestJS BFF
+
+Streamlit has been removed. The production web-facing server is now the
+NestJS BFF in `nestjs/`. It exposes `POST /api/query`, forwards validated
+requests to FastAPI at `/api/v1/query`, and keeps `API_KEY` server-side.
+NestJS does not provide a browser UI; a separate frontend can consume this
+gateway later.
+
+Build and run the BFF locally:
+
+```powershell
+Set-Location nestjs
+npm ci
+npm run build
+npm start
+```
+
+In Compose, the BFF is available internally on port `3000` and uses
+`FASTAPI_URL=http://api:8000`. The public Caddy profile routes `/api/query`
+through NestJS and never exposes the FastAPI credential to clients.
 
 ## Local production infrastructure
 
@@ -147,16 +163,71 @@ Build and run the API with PostgreSQL after setting the required values:
 $env:SOURCE_SHA256 = "<SHA-256 of the indexed source PDF>"
 $env:GROQ_API_KEY = "<provider key>"
 $env:API_KEY = "<long random API key>"
+$env:POSTGRES_PASSWORD = "<unique database password>"
 docker compose up -d --build
 docker compose ps
 ```
 
 The API container runs as a non-root user and exposes port `8000`. The
-PostgreSQL password and provider key shown above are for local development
-only; production deployments must use managed secrets and a non-default
-database password. PostgreSQL retrieval uses a bounded connection pool
+Compose default database password is only for local development; staging and
+production must inject `POSTGRES_PASSWORD` from a secret manager. Do not put
+production secrets in `.env.example`, source control, or image layers.
+Interactive API documentation is enabled by default for development and
+disabled in the production Compose configuration (`API_DOCS_ENABLED=false`).
+The API also emits browser security headers, including content-type,
+clickjacking, referrer, and permissions protections. HSTS is emitted when
+requests arrive over HTTPS; the Caddy edge proxy provides HTTPS in production.
+PostgreSQL retrieval uses a bounded connection pool
 (`DATABASE_POOL_MIN_SIZE=1`, `DATABASE_POOL_MAX_SIZE=10`) that is closed during
 API shutdown.
+
+For zero-downtime API-key rotation, set `API_KEYS` to a comma-separated list
+containing the current and replacement keys. Deploy with both keys, update
+clients to the replacement, then remove the old key in a second deployment:
+
+```powershell
+$env:API_KEYS = "<current-key>,<replacement-key>"
+docker compose up -d
+# After all clients migrate:
+$env:API_KEYS = "<replacement-key>"
+docker compose up -d
+```
+
+`API_KEY` remains supported as the single-key fallback. Store these values in
+the platform secret manager and never commit them.
+
+Use the production override to fail fast when required secrets are missing:
+
+```powershell
+$env:POSTGRES_DB = "ghana_law"
+$env:POSTGRES_USER = "ghana_law"
+$env:POSTGRES_PASSWORD = "<managed database password>"
+$env:DATABASE_URL = "postgresql+psycopg://<user>:<password>@<managed-host>:5432/<database>"
+docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build
+```
+
+For managed PostgreSQL, point `DATABASE_URL` at the managed service and omit
+the local PostgreSQL service from the deployment. Never paste secret values
+into shell history or CI logs; inject them through the hosting platform's
+secret store.
+
+For a TLS edge proxy, set a DNS record for the API host, then start the
+optional Caddy profile:
+
+```powershell
+$env:API_DOMAIN = "api.example.com"
+docker compose --profile edge up -d
+```
+
+Caddy obtains and renews the certificate through Let's Encrypt for a public
+domain, forwards only `/health/*` and `/api/*`, and returns `404` for
+`/metrics`. Keep the API
+container bound to localhost as configured here so clients cannot bypass the
+TLS proxy. Caddy emits HSTS for HTTPS clients, and requests larger than 64 KiB
+are rejected at the edge before they reach FastAPI. In production, also keep
+PostgreSQL private and replace the development database password with a
+managed secret.
 
 The query endpoint requires the `X-API-Key` header when
 `REQUIRE_API_KEY=true`:
