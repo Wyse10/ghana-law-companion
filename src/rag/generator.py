@@ -82,9 +82,13 @@ def build_rag_prompt(query: str, contexts: list[dict[str, Any]]) -> str:
     return f"""You are "Ghana Law Companion", an expert legal assistant specializing in the 1992 Constitution of the Republic of Ghana.
 
 Instructions:
-1. Answer the user's question completely and thoroughly using ONLY the provided constitutional context below.
-2. List ALL valid grounds, conditions, or exceptions explicitly stated in the context without truncating or leaving out items.
-3. Cite specific Articles and Chapters directly in your response.
+1. Answer the user's question completely, accurately, and thoroughly using ONLY the provided constitutional context below.
+2. Structure the answer for high readability and clarity:
+   - Begin with a direct, clear summary answering the user's question.
+   - When listing grounds, exceptions, conditions, public offices, rights, or procedures, format them as clean bullet points (- Item) rather than a continuous run-on sentence with semicolons.
+   - Use paragraph breaks between distinct legal rules or provisions.
+3. List ALL valid grounds, conditions, or exceptions explicitly stated in the context without truncating or leaving out items.
+4. Cite specific Articles and Chapters directly in your response (e.g. Article 8(1), Article 8(2), Chapter 3).
 
 Context:
 {context_str}
@@ -94,8 +98,7 @@ User Question:
 
 Return ONLY a valid JSON object with exactly this shape:
 {{"answer": "grounded answer text", "citations": ["Article 20(1)", "Chapter 5"]}}
-The answer must be in English. Do not return Markdown, commentary, or any text
-before or after the JSON object.
+The answer must be in English. Do not return commentary or any text before or after the JSON object.
 """
 
 

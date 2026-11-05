@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ghana Law Companion | Constitutional Legal Intelligence</title>
+  <meta name="description" content="AI-assisted, source-grounded research aid for the 1992 Constitution of the Republic of Ghana with verified citations." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <!-- Top Ghana Accent Ribbon -->
+  <div class="ghana-ribbon" aria-hidden="true">
+    <span class="ribbon-red"></span>
+    <span class="ribbon-gold"></span>
+    <span class="ribbon-green"></span>
+  </div>
+
+  <!-- Main Application Wrapper -->
+  <div class="app-layout">
+    
+    <!-- Left Navigation / Chapter Explorer -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-icon">⚖️</div>
+          <div>
+            <h1 class="brand-title">Ghana Law Companion</h1>
+            <p class="brand-subtitle">1992 Constitution of Ghana</p>
+          </div>
+        </div>
+        <button class="icon-btn mobile-only" id="closeSidebarBtn" title="Close Chapters">✕</button>
+      </div>
+
+      <div class="sidebar-meta-card">
+        <div class="meta-row">
+          <span class="meta-label">Source Edition</span>
+          <span class="meta-value">1992 (Rev. 1996)</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Indexed Scope</span>
+          <span class="meta-value">348 Clauses</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Embeddings</span>
+          <span class="meta-value">BAAI/bge-base-en</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Grounding</span>
+          <span class="meta-value badge-verified">Strict Citation Guard</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section-title">
+        <span>Constitutional Chapters (26)</span>
+        <span class="chapter-count-pill" id="activeFilterBadge">All</span>
+      </div>
+
+      <div class="chapter-list" id="chapterList">
+        <!-- Dynamically populated chapters -->
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="status-indicator-box">
+          <span class="status-dot status-checking" id="statusDot"></span>
+          <span class="status-text" id="statusText">Connecting to BFF...</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      
+      <!-- Top Bar -->
+      <header class="topbar">
+        <button class="sidebar-toggle-btn mobile-only" id="openSidebarBtn" aria-label="Toggle Chapters">
+          <span>☰</span> Chapters
+        </button>
+        <div class="topbar-center">
+          <span class="topbar-tag">Verified Constitutional RAG</span>
+          <span class="topbar-subtag">Republic of Ghana</span>
+        </div>
+        <div class="topbar-right">
+          <button class="btn-text" id="helpModalBtn">
+            <span>ℹ️</span> About & Usage
+          </button>
+        </div>
+      </header>
+
+      <!-- Search Section -->
+      <section class="search-section">
+        <div class="search-container">
+          <div class="search-header">
+            <h2 class="search-title">Ask the Constitution</h2>
+            <p class="search-desc">Pose questions about fundamental rights, executive powers, citizenship, judiciary jurisdiction, or any constitutional provision.</p>
+          </div>
+
+          <form id="queryForm" class="query-form">
+            <div class="input-card">
+              <textarea
+                id="queryInput"
+                class="query-input"
+                rows="3"
+                placeholder="E.g., What are the valid grounds for restricting personal liberty under Article 14?"
+                required
+              ></textarea>
+              
+              <div class="input-actions-bar">
+                <div class="filter-controls">
+                  <!-- Chapter Filter Dropdown -->
+                  <div class="select-group">
+                    <label for="chapterSelect">Chapter Filter:</label>
+                    <select id="chapterSelect" class="styled-select">
+                      <option value="">All Chapters (1–26)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="submit-controls">
+                  <button type="button" class="btn-secondary" id="clearBtn" title="Clear query">Clear</button>
+                  <button type="submit" class="btn-primary" id="submitBtn">
+                    <span class="btn-icon">⚡</span>
+                    <span class="btn-label">Research & Answer</span>
+                    <kbd class="shortcut-kbd">Ctrl+↵</kbd>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          <!-- Suggested Questions Chips -->
+          <div class="suggestions-wrapper">
+            <span class="suggestions-label">Try asking:</span>
+            <div class="chips-container" id="suggestionsContainer">
+              <button class="chip" data-query="What are the valid constitutional grounds for restricting personal liberty?">
+                <span>🛡️</span> Personal Liberty (Art. 14)
+              </button>
+              <button class="chip" data-query="Under what circumstances is an intentional deprivation of life not considered a violation?">
+                <span>⚖️</span> Right to Life Exceptions (Art. 13)
+              </button>
+              <button class="chip" data-query="What process must the President follow to create a new region or alter regional boundaries?">
+                <span>🗺️</span> Creating Regions (Art. 5)
+              </button>
+              <button class="chip" data-query="Can a Ghanaian citizen hold dual citizenship, and are there restrictions on public offices they can occupy?">
+                <span>🇬🇭</span> Dual Citizenship (Art. 8)
+              </button>
+              <button class="chip" data-query="What constitutes the sovereign territory of Ghana according to the Constitution?">
+                <span>🌊</span> Sovereign Territory (Art. 4)
+              </button>
+              <button class="chip" data-query="Under what conditions may private property be compulsorily taken or acquired by the state?">
+                <span>🏛️</span> Property Acquisition (Art. 20)
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Error State Banner -->
+      <section class="error-banner hidden" id="errorBanner">
+        <div class="error-icon">⚠️</div>
+        <div class="error-content">
+          <h4 class="error-title" id="errorTitle">Query Failed</h4>
+          <p class="error-message" id="errorMessage"></p>
+        </div>
+        <button class="icon-btn" id="dismissErrorBtn" title="Dismiss">✕</button>
+      </section>
+
+      <!-- Loading State Skeleton -->
+      <section class="loading-state hidden" id="loadingState">
+        <div class="spinner-box">
+          <div class="legal-spinner"></div>
+          <div class="loading-steps">
+            <p class="loading-main-text" id="loadingStageText">Searching constitutional clauses...</p>
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" id="loadingProgress"></div>
+            </div>
+            <p class="loading-subtext">Executing local BGE vector embeddings, hybrid reranking, and Groq generation with citation validation.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Results Display Section -->
+      <section class="results-section hidden" id="resultsSection">
+        
+        <!-- Answer Card -->
+        <article class="answer-card" id="answerCard">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="badge-status-green">✓ Citation Grounded</span>
+              <h3 class="card-title">Constitutional Analysis</h3>
+            </div>
+            <div class="card-actions">
+              <button class="action-btn" id="copyAnswerBtn" title="Copy Answer to clipboard">
+                <span class="copy-icon">📋</span> Copy Answer
+              </button>
+            </div>
+          </div>
+
+          <!-- Answer Body -->
+          <div class="answer-body" id="answerText">
+            <!-- Dynamic parsed response inserted here -->
+          </div>
+
+          <!-- Verified Citations Section -->
+          <div class="citations-panel">
+            <div class="citations-header">
+              <span class="citations-icon">📜</span>
+              <span class="citations-title">Verified Constitutional Citations:</span>
+            </div>
+            <div class="citations-list" id="citationsList">
+              <!-- Verified citation badges inserted here -->
+            </div>
+          </div>
+
+          <!-- Performance & Timing Bar -->
+          <div class="timing-bar">
+            <div class="timing-metric">
+              <span class="timing-label">Retrieval:</span>
+              <span class="timing-val" id="metricRetrieval">-- ms</span>
+            </div>
+            <div class="timing-metric">
+              <span class="timing-label">Generation:</span>
+              <span class="timing-val" id="metricGeneration">-- ms</span>
+            </div>
+            <div class="timing-metric">
+              <span class="timing-label">Total Time:</span>
+              <span class="timing-val highlight" id="metricTotal">-- ms</span>
+            </div>
+            <div class="timing-metric">
+              <span class="timing-label">Sources Analyzed:</span>
+              <span class="timing-val" id="metricSources">--</span>
+            </div>
+            <div class="timing-metric request-id">
+              <span class="timing-label">Req ID:</span>
+              <span class="timing-val mono" id="metricRequestId">--</span>
+            </div>
+          </div>
+
+          <!-- Legal Disclaimer -->
+          <div class="disclaimer-callout">
+            <span class="disclaimer-icon">⚖️</span>
+            <p class="disclaimer-text">
+              <strong>Official Disclaimer:</strong> This response is synthesized exclusively from the indexed 1992 Constitution of Ghana (revised 1996 edition) for legal research and education. It does not constitute legal advice and cannot replace consultation with a qualified Ghanaian lawyer.
+            </p>
+          </div>
+        </article>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast hidden" id="toast">Message copied!</div>
+
+  <!-- About / Help Modal -->
+  <div class="modal-backdrop hidden" id="helpModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">About Ghana Law Companion</h3>
+        <button class="icon-btn" id="closeHelpBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Ghana Law Companion</strong> is an advanced, source-grounded legal assistant specialized in the <strong>1992 Constitution of the Republic of Ghana</strong>.</p>
+        
+        <h4>Key Technical Guardrails</h4>
+        <ul>
+          <li><strong>Zero Hallucination Citations:</strong> Every citation returned by the model is programmatically verified against retrieved constitutional articles. Unsupported citations are rejected at the service boundary.</li>
+          <li><strong>Clause-Level Precision:</strong> Ingestion splits articles by numbered clauses while preserving lettered sub-paragraphs and context headers.</li>
+          <li><strong>Hybrid Retrieval:</strong> Combines local 768-dimensional FastEmbed vector search (BAAI/bge-base-en-v1.5) with lexical term coverage and constitutional reference bonuses.</li>
+          <li><strong>Architectural Separation:</strong> Edge proxy (Caddy) $\rightarrow$ Backend-For-Frontend (NestJS) $\rightarrow$ Core Engine (FastAPI) $\rightarrow$ Local / PostgreSQL pgvector store.</li>
+        </ul>
+
+        <h4>Keyboard Shortcuts</h4>
+        <p><kbd>Ctrl</kbd> + <kbd>Enter</kbd> : Submit Query<br><kbd>Esc</kbd> : Close Modals</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="confirmHelpBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -9,8 +9,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.QueryService = void 0;
 const common_1 = require("@nestjs/common");
 let QueryService = class QueryService {
-    fastApiUrl = process.env.FASTAPI_URL ?? "http://api:8000";
-    apiKey = process.env.API_KEY ?? "";
+    get fastApiUrl() {
+        return process.env.FASTAPI_URL || "http://127.0.0.1:8000";
+    }
+    get apiKey() {
+        return process.env.API_KEY || "";
+    }
     async forward(request) {
         if (!request.query?.trim()) {
             throw new common_1.BadRequestException("query must not be empty");

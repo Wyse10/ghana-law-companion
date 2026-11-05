@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "embedding_model": "BAAI/bge-base-en-v1.5",
+  "embedding_dimension": 768,
+  "chunk_count": 348,
+  "source_sha256": "6fef957b557edd7ba3a948833dc203cf989131a533456713dd25b9a19e5f5660"
+}

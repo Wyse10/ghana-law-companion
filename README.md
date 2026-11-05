@@ -95,26 +95,47 @@ the complete structured response, use
 `generate_legal_answer` wrapper returns only the validated answer text for
 evaluation and internal library callers.
 
-## NestJS BFF
+## User-facing client & NestJS BFF
 
-Streamlit has been removed. The production web-facing server is now the
-NestJS BFF in `nestjs/`. It exposes `POST /api/query`, forwards validated
-requests to FastAPI at `/api/v1/query`, and keeps `API_KEY` server-side.
-NestJS does not provide a browser UI; a separate frontend can consume this
-gateway later.
+The modern, responsive user-facing client is served directly by the NestJS
+gateway in `nestjs/`. It features:
+- Interactive constitutional search with live query suggestions and keyboard shortcuts (`Ctrl+Enter`).
+- Constitutional Chapter Explorer (all 26 chapters with instant filtering).
+- Verified citation badges that highlight and scroll to matching source clauses.
+- Retrieval timing metrics and full source context inspector with similarity scores.
+- Copy answers, citations, and full legal reports to clipboard.
 
-Build and run the BFF locally:
+### Running the complete application locally
+
+To start both the FastAPI core engine and the NestJS client in one command:
+
+```powershell
+.\scripts\run_app.ps1
+```
+
+Then open your browser to **http://localhost:3000**.
+
+### Running end-to-end integration tests
+
+Run the automated integration test to verify the full flow (FastAPI + NestJS + Static Client Delivery + Live Constitutional RAG generation):
+
+```powershell
+.\scripts\test_client.ps1
+# or
+uv run python scripts/test_end_to_end.py
+```
+
+### Manual BFF build and run
 
 ```powershell
 Set-Location nestjs
-npm ci
 npm run build
 npm start
 ```
 
-In Compose, the BFF is available internally on port `3000` and uses
-`FASTAPI_URL=http://api:8000`. The public Caddy profile routes `/api/query`
-through NestJS and never exposes the FastAPI credential to clients.
+In Compose, the BFF is available on port `3000` and uses
+`FASTAPI_URL=http://api:8000`. Caddy routes public web traffic and `/api/query`
+through NestJS, keeping the internal FastAPI credential secure server-side.
 
 ## Local production infrastructure
 

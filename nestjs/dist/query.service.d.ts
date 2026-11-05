@@ -4,7 +4,7 @@ export interface QueryRequest {
     chapter?: string | null;
 }
 export declare class QueryService {
-    private readonly fastApiUrl;
-    private readonly apiKey;
+    private get fastApiUrl();
+    private get apiKey();
     forward(request: QueryRequest): Promise<unknown>;
 }

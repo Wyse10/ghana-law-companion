@@ -11,11 +11,8 @@
     @health path /health/live /health/ready
     reverse_proxy @health api:8000
 
-    @bff path /api/query /api/health/*
-    reverse_proxy @bff nestjs:3000
-
     @api path /api/v1/*
     reverse_proxy @api api:8000
 
-    respond 404
+    reverse_proxy nestjs:3000
 }

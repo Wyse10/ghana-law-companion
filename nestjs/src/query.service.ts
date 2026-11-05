@@ -13,8 +13,13 @@ export interface QueryRequest {
 
 @Injectable()
 export class QueryService {
-  private readonly fastApiUrl = process.env.FASTAPI_URL ?? "http://api:8000";
-  private readonly apiKey = process.env.API_KEY ?? "";
+  private get fastApiUrl(): string {
+    return process.env.FASTAPI_URL || "http://127.0.0.1:8000";
+  }
+
+  private get apiKey(): string {
+    return process.env.API_KEY || "";
+  }
 
   async forward(request: QueryRequest): Promise<unknown> {
     if (!request.query?.trim()) {

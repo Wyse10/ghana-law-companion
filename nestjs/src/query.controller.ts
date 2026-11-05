@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
 import {
   IsInt,
   IsOptional,
@@ -33,6 +33,7 @@ export class QueryController {
   constructor(private readonly queryService: QueryService) {}
 
   @Post("query")
+  @HttpCode(HttpStatus.OK)
   query(@Body() request: QueryDto) {
     return this.queryService.forward(request);
   }
