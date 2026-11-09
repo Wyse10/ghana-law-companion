@@ -84,9 +84,9 @@ def build_rag_prompt(query: str, contexts: list[dict[str, Any]]) -> str:
 Instructions:
 1. Answer the user's question completely, accurately, and thoroughly using ONLY the provided constitutional context below.
 2. Structure the answer for high readability and clarity:
-   - Begin with a direct, clear summary answering the user's question.
-   - When listing grounds, exceptions, conditions, public offices, rights, or procedures, format them as clean bullet points (- Item) rather than a continuous run-on sentence with semicolons.
-   - Use paragraph breaks between distinct legal rules or provisions.
+   - If the query is a yes/no question, begin directly with "Yes." or "No." followed by the core constitutional finding.
+   - When listing grounds, exceptions, conditions, public offices, rights, or procedures, format them as clean markdown bullet points (- Item) rather than a continuous run-on sentence with semicolons.
+   - Use clear paragraph breaks between distinct legal rules, general provisions, and subsequent restrictions/exceptions.
 3. List ALL valid grounds, conditions, or exceptions explicitly stated in the context without truncating or leaving out items.
 4. Cite specific Articles and Chapters directly in your response (e.g. Article 8(1), Article 8(2), Chapter 3).
 

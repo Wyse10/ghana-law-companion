@@ -148,7 +148,6 @@ def run_tests() -> int:
         print("\n[5/5] Executing Live Constitutional RAG Query via NestJS BFF...")
         test_payload = {
             "query": "What are the valid constitutional reasons for restricting a person's personal liberty?",
-            "top_k": 3,
             "chapter": "5",
         }
         query_req = urllib.request.Request(

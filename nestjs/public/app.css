@@ -749,6 +749,79 @@ html, body {
   margin-bottom: 22px;
 }
 
+/* Direct Answer Verdict Callout */
+.direct-answer-callout {
+  border-radius: var(--radius-md);
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  border: 1px solid;
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.direct-answer-callout.verdict-yes {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(6, 78, 59, 0.3));
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.direct-answer-callout.verdict-no {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(127, 29, 29, 0.3));
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.callout-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.verdict-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 4px 12px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.verdict-yes .verdict-pill {
+  background-color: var(--green-primary);
+  color: #064e3b;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.verdict-no .verdict-pill {
+  background-color: #ef4444;
+  color: #450a0a;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+.verdict-icon {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.callout-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.callout-text {
+  font-size: 15.5px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.65;
+  margin: 0;
+}
+
 .legal-paragraph {
   margin-bottom: 16px;
   line-height: 1.75;
@@ -757,22 +830,35 @@ html, body {
 
 .legal-bullet-list {
   list-style: none;
-  margin: 12px 0 20px 0;
+  margin: 14px 0 22px 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
 .legal-bullet-list li {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  background-color: rgba(30, 41, 59, 0.45);
-  border: 1px solid rgba(51, 65, 85, 0.6);
+  background-color: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(51, 65, 85, 0.7);
   border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  color: #e2e8f0;
+  padding: 11px 16px;
+  color: #f1f5f9;
   line-height: 1.6;
+  transition: all 0.2s ease;
+}
+
+.legal-bullet-list li:hover {
+  background-color: rgba(30, 41, 59, 0.8);
+  border-color: rgba(245, 158, 11, 0.4);
+  transform: translateX(3px);
+}
+
+.bullet-icon {
+  font-size: 15px;
+  line-height: 1.3;
+  flex-shrink: 0;
 }
 
 .bullet-check {

@@ -18,7 +18,6 @@ const class_validator_1 = require("class-validator");
 const query_service_1 = require("./query.service");
 class QueryDto {
     query;
-    top_k;
     chapter;
 }
 exports.QueryDto = QueryDto;
@@ -28,13 +27,6 @@ __decorate([
     (0, class_validator_1.MaxLength)(10_000),
     __metadata("design:type", String)
 ], QueryDto.prototype, "query", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsInt)(),
-    (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(10),
-    __metadata("design:type", Number)
-], QueryDto.prototype, "top_k", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

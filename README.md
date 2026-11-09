@@ -102,8 +102,7 @@ gateway in `nestjs/`. It features:
 - Interactive constitutional search with live query suggestions and keyboard shortcuts (`Ctrl+Enter`).
 - Constitutional Chapter Explorer (all 26 chapters with instant filtering).
 - Verified citation badges that highlight and scroll to matching source clauses.
-- Retrieval timing metrics and full source context inspector with similarity scores.
-- Copy answers, citations, and full legal reports to clipboard.
+- Structured constitutional analysis with direct findings, formatted clauses, and retrieval timing metrics.
 
 ### Running the complete application locally
 
@@ -258,7 +257,7 @@ Invoke-RestMethod -Method Post `
   -Uri http://localhost:8000/api/v1/query `
   -Headers @{ "X-API-Key" = $env:API_KEY } `
   -ContentType "application/json" `
-  -Body '{"query":"What protects personal liberty?","top_k":5}'
+  -Body '{"query":"What protects personal liberty?"}'
 ```
 
 Health endpoints remain public for load balancer probes. Store the API key in

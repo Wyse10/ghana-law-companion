@@ -7,7 +7,6 @@ import {
 
 export interface QueryRequest {
   query: string;
-  top_k?: number;
   chapter?: string | null;
 }
 
@@ -33,7 +32,10 @@ export class QueryService {
           "Content-Type": "application/json",
           "X-API-Key": this.apiKey,
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify({
+          query: request.query.trim(),
+          chapter: request.chapter || null,
+        }),
         signal: AbortSignal.timeout(65_000),
       });
       const payload: unknown = await response.json();

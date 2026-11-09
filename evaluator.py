@@ -20,19 +20,12 @@ vector_store = LocalVectorStore(DB_PATH)
 def run_single_evaluation(test_index: int):
     tests = load_tests(DATASET_PATH)
     if not (0 <= test_index < len(tests)):
-        return "Invalid Test Index", "", "", "", "", "", 0, 0, 0, 0, 0, 0
+        return "Invalid Test Index", "", "", "", "", 0, 0, 0, 0, 0, 0
 
     test: TestQuestion = tests[test_index]
 
-    ret_eval, ans_eval, generated_answer, retrieved_docs = evaluate_test_case(
+    ret_eval, ans_eval, generated_answer, _ = evaluate_test_case(
         test, vector_store
-    )
-
-    formatted_docs = "\n\n---\n\n".join(
-        [
-            f"**[Chunk {idx+1}] (Article {doc.get('article_number', 'N/A')})**\n{doc.get('text', '')}"
-            for idx, doc in enumerate(retrieved_docs)
-        ]
     )
 
     return (
@@ -40,7 +33,6 @@ def run_single_evaluation(test_index: int):
         ", ".join(test.keywords),
         test.ground_truth_answer,
         generated_answer,
-        formatted_docs,
         ans_eval.feedback,
         round(ret_eval.mrr, 4),
         round(ret_eval.ndcg, 4),
@@ -145,14 +137,11 @@ with gr.Blocks(title="Ghana Law Companion - Evaluation Dashboard") as app:
 
                     fb_box = gr.Textbox(label="Judge Feedback", interactive=False, lines=3)
 
-            with gr.Accordion("Retrieved Context Chunks", open=False):
-                ctx_box = gr.Markdown()
-
             eval_btn.click(
                 fn=run_single_evaluation,
                 inputs=[test_idx],
                 outputs=[
-                    q_box, kw_box, gt_box, gen_box, ctx_box, fb_box,
+                    q_box, kw_box, gt_box, gen_box, fb_box,
                     mrr_out, ndcg_out, cov_out, acc_out, comp_out, rel_out
                 ],
             )
