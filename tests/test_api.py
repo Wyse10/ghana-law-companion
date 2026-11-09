@@ -139,6 +139,78 @@ class FastAPITests(unittest.TestCase):
         self.assertEqual(payload["sources"][0]["article_number"], "14")
         self.assertEqual(payload["request_id"], "test-request")
 
+    def test_multi_turn_conversation_flow(self) -> None:
+        from unittest.mock import MagicMock
+        from src.api.memory import ConversationMemory
+        from src.api.services import RAGService
+        from src.schemas import LegalAnswer
+
+        memory = ConversationMemory()
+        fake_store = MagicMock()
+        fake_store.query.return_value = []
+        fake_store.payloads = []
+
+        service = RAGService(vector_store=fake_store, memory=memory)
+
+        with (
+            patch("src.api.services.retrieve_relevant_context", return_value=[
+                {"text": "Article 8 text", "article_number": "8", "chapter_number": "3", "score": 0.9}
+            ]),
+            patch("src.api.services.generate_legal_answer_structured") as mock_gen,
+            patch("src.api.main._get_rag_service", return_value=service),
+        ):
+            mock_gen.return_value = LegalAnswer(
+                answer="Under Article 8(1), dual citizenship is permitted.",
+                citations=["Article 8(1)"],
+            )
+
+            # Turn 1: Initial query
+            res1 = self.client.post(
+                "/api/v1/query",
+                json={"query": "Can a Ghanaian citizen hold dual citizenship?"},
+            )
+            self.assertEqual(res1.status_code, 200)
+            data1 = res1.json()
+            session_id = data1["session_id"]
+            self.assertTrue(bool(session_id))
+            self.assertEqual(len(data1["history"]), 2)
+
+            # Turn 2: Follow-up query using session_id
+            mock_gen.return_value = LegalAnswer(
+                answer="Under Article 8(2), the restriction applies to citizens holding another citizenship.",
+                citations=["Article 8(2)"],
+            )
+            res2 = self.client.post(
+                "/api/v1/query",
+                json={
+                    "query": "Does that exception apply to non-citizens?",
+                    "session_id": session_id,
+                },
+            )
+            self.assertEqual(res2.status_code, 200)
+            data2 = res2.json()
+            self.assertEqual(data2["session_id"], session_id)
+            self.assertEqual(len(data2["history"]), 4)
+            self.assertEqual(
+                data2["history"][2]["content"],
+                "Does that exception apply to non-citizens?",
+            )
+
+            # Test GET conversation history endpoint
+            history_res = self.client.get(f"/api/v1/conversations/{session_id}")
+            self.assertEqual(history_res.status_code, 200)
+            self.assertEqual(len(history_res.json()["messages"]), 4)
+
+            # Test DELETE conversation endpoint
+            del_res = self.client.delete(f"/api/v1/conversations/{session_id}")
+            self.assertEqual(del_res.status_code, 200)
+            self.assertEqual(del_res.json()["cleared"], "true")
+
+            # Verify history is now empty
+            history_res2 = self.client.get(f"/api/v1/conversations/{session_id}")
+            self.assertEqual(history_res2.status_code, 200)
+            self.assertEqual(len(history_res2.json()["messages"]), 0)
+
     def test_health_endpoints_remain_public_when_authentication_enabled(self) -> None:
         with patch(
             "src.api.auth.get_settings",
@@ -306,3 +378,72 @@ class RateLimitTests(unittest.IsolatedAsyncioTestCase):
         response = await middleware.dispatch(request, next_handler)
 
         self.assertEqual(response.status_code, 429)
+
+
+class ConversationMemoryTests(unittest.TestCase):
+    def test_memory_session_lifecycle(self) -> None:
+        from src.api.memory import ConversationMemory
+
+        memory = ConversationMemory(max_turns=3)
+        session_id = memory.get_or_create_session()
+        self.assertTrue(bool(session_id))
+
+        # Add 4 turns (should trim to max_turns=3, i.e. 6 messages)
+        for i in range(1, 5):
+            memory.add_turn(
+                session_id=session_id,
+                user_query=f"Question {i}",
+                assistant_answer=f"Answer {i}",
+                citations=[f"Article {i}"],
+            )
+
+        history = memory.get_history(session_id)
+        self.assertEqual(len(history), 6)  # 3 turns * 2 messages
+        self.assertEqual(history[0].content, "Question 2")
+        self.assertEqual(history[-1].content, "Answer 4")
+
+        # Test contextual query builder
+        enriched = memory.build_contextual_query(session_id, "Does that exception apply?")
+        self.assertIn("Question 4", enriched)
+        self.assertIn("Article 4", enriched)
+
+        # Test clearing
+        cleared = memory.clear_session(session_id)
+        self.assertTrue(cleared)
+        self.assertEqual(len(memory.get_history(session_id)), 0)
+
+    def test_multi_turn_prompt_includes_history(self) -> None:
+        from src.rag.generator import build_rag_prompt
+
+        history = [
+            {"role": "user", "content": "Can dual citizens hold public office?"},
+            {
+                "role": "assistant",
+                "content": "Article 8(2) restricts them from certain offices.",
+                "citations": ["Article 8(2)"],
+            },
+        ]
+        context = [{
+            "text": "Article 8(2) text...",
+            "article_number": "8",
+            "chapter_number": "3",
+            "score": 0.9,
+            "metadata": {
+                "chapter_number": "3",
+                "chapter_title": "Citizenship",
+                "article_number": "8",
+                "article_title": "Citizenship",
+                "page": 1,
+                "source": "pdf",
+            },
+        }]
+
+        prompt = build_rag_prompt(
+            query="Does that exception apply to non-citizens?",
+            contexts=context,
+            history=history,
+        )
+        self.assertIn("Conversation History:", prompt)
+        self.assertIn("Can dual citizens hold public office?", prompt)
+        self.assertIn("Does that exception apply to non-citizens?", prompt)
+        self.assertIn("use the conversation history to resolve the reference accurately", prompt)

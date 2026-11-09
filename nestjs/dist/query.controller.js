@@ -19,6 +19,7 @@ const query_service_1 = require("./query.service");
 class QueryDto {
     query;
     chapter;
+    session_id;
 }
 exports.QueryDto = QueryDto;
 __decorate([
@@ -33,6 +34,12 @@ __decorate([
     (0, class_validator_1.MaxLength)(20),
     __metadata("design:type", Object)
 ], QueryDto.prototype, "chapter", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(128),
+    __metadata("design:type", Object)
+], QueryDto.prototype, "session_id", void 0);
 let QueryController = class QueryController {
     queryService;
     constructor(queryService) {
@@ -40,6 +47,9 @@ let QueryController = class QueryController {
     }
     query(request) {
         return this.queryService.forward(request);
+    }
+    clearSession(sessionId) {
+        return this.queryService.clearSession(sessionId);
     }
 };
 exports.QueryController = QueryController;
@@ -51,6 +61,14 @@ __decorate([
     __metadata("design:paramtypes", [QueryDto]),
     __metadata("design:returntype", void 0)
 ], QueryController.prototype, "query", null);
+__decorate([
+    (0, common_1.Delete)("session/:sessionId"),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Param)("sessionId")),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], QueryController.prototype, "clearSession", null);
 exports.QueryController = QueryController = __decorate([
     (0, common_1.Controller)(),
     __metadata("design:paramtypes", [query_service_1.QueryService])

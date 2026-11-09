@@ -35,6 +35,8 @@ const CONSTITUTION_CHAPTERS = [
 // State
 let selectedChapterFilter = "";
 let currentResponseData = null;
+let currentSessionId = null;
+let sessionTurnCount = 0;
 
 // DOM Elements
 const queryForm = document.getElementById("queryForm");
@@ -44,6 +46,9 @@ const submitBtn = document.getElementById("submitBtn");
 const clearBtn = document.getElementById("clearBtn");
 const chapterList = document.getElementById("chapterList");
 const suggestionsContainer = document.getElementById("suggestionsContainer");
+const conversationIndicator = document.getElementById("conversationIndicator");
+const conversationTurnCount = document.getElementById("conversationTurnCount");
+const resetSessionBtn = document.getElementById("resetSessionBtn");
 
 const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
@@ -207,6 +212,11 @@ function attachEventListeners() {
     selectChapter(e.target.value);
   });
 
+  // Reset conversation button
+  if (resetSessionBtn) {
+    resetSessionBtn.addEventListener("click", resetConversation);
+  }
+
   // Clear button
   clearBtn.addEventListener("click", () => {
     queryInput.value = "";
@@ -259,7 +269,8 @@ async function handleSubmit(e) {
 
   const payload = {
     query: query,
-    chapter: selectedChapterFilter || null
+    chapter: selectedChapterFilter || null,
+    session_id: currentSessionId || null
   };
 
   try {
@@ -343,8 +354,50 @@ function renderResults(data) {
   metricSources.textContent = `${data.sources ? data.sources.length : 0} clauses`;
   metricRequestId.textContent = data.request_id ? data.request_id.slice(0, 8) : "--";
 
+  // Multi-turn conversational session tracking
+  if (data.session_id) {
+    currentSessionId = data.session_id;
+  }
+  if (Array.isArray(data.history)) {
+    sessionTurnCount = Math.floor(data.history.length / 2);
+  } else {
+    sessionTurnCount++;
+  }
+  updateConversationUI();
+
   // Smooth scroll to results
   resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Update UI to reflect multi-turn conversation status
+function updateConversationUI() {
+  if (sessionTurnCount > 0 && conversationIndicator) {
+    conversationIndicator.classList.remove("hidden");
+    if (conversationTurnCount) {
+      conversationTurnCount.textContent = sessionTurnCount;
+    }
+    queryInput.placeholder = "Ask a contextual follow-up (e.g. 'Does that exception apply to non-citizens?')...";
+  } else if (conversationIndicator) {
+    conversationIndicator.classList.add("hidden");
+    queryInput.placeholder = "E.g., What are the valid grounds for restricting personal liberty under Article 14?";
+  }
+}
+
+// Reset conversational memory session
+async function resetConversation() {
+  if (currentSessionId) {
+    try {
+      await fetch(`/api/session/${encodeURIComponent(currentSessionId)}`, {
+        method: "DELETE",
+      });
+    } catch (_) {}
+  }
+  currentSessionId = null;
+  sessionTurnCount = 0;
+  updateConversationUI();
+  queryInput.value = "";
+  queryInput.focus();
+  showToast("Started fresh conversation.");
 }
 
 /**

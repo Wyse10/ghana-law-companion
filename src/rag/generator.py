@@ -69,7 +69,11 @@ def rerank_contexts(
     return [context.model_dump(mode="json") for _, _, context in ranked_contexts]
 
 
-def build_rag_prompt(query: str, contexts: list[dict[str, Any]]) -> str:
+def build_rag_prompt(
+    query: str,
+    contexts: list[dict[str, Any]],
+    history: list[dict[str, Any]] | None = None,
+) -> str:
     request = QueryRequest(query=query)
     validated_contexts = [RetrievedContext.model_validate(context) for context in contexts]
     context_str = "\n\n".join(
@@ -79,18 +83,29 @@ def build_rag_prompt(query: str, contexts: list[dict[str, Any]]) -> str:
         ]
     )
 
+    history_str = ""
+    if history:
+        history_lines = []
+        for msg in history[-6:]:  # last 3 turns
+            role = "User" if msg.get("role") == "user" else "Assistant"
+            content = msg.get("content", "").strip()
+            history_lines.append(f"{role}: {content}")
+        if history_lines:
+            history_str = "\nConversation History:\n" + "\n".join(history_lines) + "\n"
+
     return f"""You are "Ghana Law Companion", an expert legal assistant specializing in the 1992 Constitution of the Republic of Ghana.
 
 Instructions:
-1. Answer the user's question completely, accurately, and thoroughly using ONLY the provided constitutional context below.
+1. Answer the user's question completely, accurately, and thoroughly using ONLY the provided constitutional context and conversation history below.
 2. Structure the answer for high readability and clarity:
    - If the query is a yes/no question, begin directly with "Yes." or "No." followed by the core constitutional finding.
    - When listing grounds, exceptions, conditions, public offices, rights, or procedures, format them as clean markdown bullet points (- Item) rather than a continuous run-on sentence with semicolons.
    - Use clear paragraph breaks between distinct legal rules, general provisions, and subsequent restrictions/exceptions.
-3. List ALL valid grounds, conditions, or exceptions explicitly stated in the context without truncating or leaving out items.
-4. Cite specific Articles and Chapters directly in your response (e.g. Article 8(1), Article 8(2), Chapter 3).
-
-Context:
+3. If the user asks a contextual follow-up question (e.g. referencing "that exception", "those offices", "they", or prior provisions), use the conversation history to resolve the reference accurately.
+4. List ALL valid grounds, conditions, or exceptions explicitly stated in the context without truncating or leaving out items.
+5. Cite specific Articles and Chapters directly in your response (e.g. Article 8(1), Article 8(2), Chapter 3).
+{history_str}
+Context from the 1992 Constitution of Ghana:
 {context_str}
 
 User Question:
@@ -132,8 +147,9 @@ def trim_contexts_to_budget(
 def validate_answer_citations(
     answer: LegalAnswer,
     contexts: list[dict[str, Any]],
+    history: list[dict[str, Any]] | None = None,
 ) -> LegalAnswer:
-    """Reject model citations that cannot be supported by retrieved context."""
+    """Reject model citations that cannot be supported by retrieved context or conversation history."""
     validated_contexts = [
         RetrievedContext.model_validate(context) for context in contexts
     ]
@@ -150,6 +166,22 @@ def validate_answer_citations(
         for context in validated_contexts
         if context.chapter_number
     }
+
+    # If conversation history exists, also allow citations previously established in history
+    if history:
+        for msg in history:
+            for cit in msg.get("citations", []):
+                cit_art = re.search(r"\b(?:article|art\.?)\s+(\d+[a-z]?)\b", cit.lower())
+                if cit_art:
+                    supported_articles.add(cit_art.group(1))
+                cit_ch = re.search(r"\bchapter\s+(\d+[a-z]?)\b", cit.lower())
+                if cit_ch:
+                    supported_chapters.add(cit_ch.group(1))
+            for art_match in re.findall(r"\b(?:article|art\.?)\s+(\d+[a-z]?)\b", msg.get("content", "").lower()):
+                supported_articles.add(art_match)
+            for ch_match in re.findall(r"\bchapter\s+(\d+[a-z]?)\b", msg.get("content", "").lower()):
+                supported_chapters.add(ch_match)
+
     unsupported = []
     for citation in answer.citations:
         citation_lower = citation.lower()
@@ -205,6 +237,7 @@ def generate_legal_answer_structured(
     query: str,
     contexts: list[dict[str, Any]],
     model_name: str = GROQ_MODEL,
+    history: list[dict[str, Any]] | None = None,
 ) -> LegalAnswer:
     """Generate and validate the complete structured legal answer."""
     request = QueryRequest(query=query)
@@ -234,6 +267,7 @@ def generate_legal_answer_structured(
             "content": build_rag_prompt(
                 request.query,
                 [context.model_dump(mode="json") for context in validated_contexts],
+                history=history,
             ),
         },
     ]
@@ -252,6 +286,7 @@ def generate_legal_answer_structured(
             return validate_answer_citations(
                 parsed,
                 [context.model_dump(mode="json") for context in validated_contexts],
+                history=history,
             )
         except (OpenAIError, RuntimeError, ValueError) as error:
             last_error = error
@@ -262,15 +297,19 @@ def generate_legal_answer(
     query: str,
     contexts: list[dict[str, Any]],
     model_name: str = GROQ_MODEL,
+    history: list[dict[str, Any]] | None = None,
 ) -> str:
     """Return the validated answer text for existing UI and evaluation callers."""
-    return generate_legal_answer_structured(query, contexts, model_name).answer
+    return generate_legal_answer_structured(
+        query, contexts, model_name, history=history
+    ).answer
 
 
 def generate_legal_answer_stream(
     query: str,
     contexts: list[dict[str, Any]],
     model_name: str = GROQ_MODEL,
+    history: list[dict[str, Any]] | None = None,
 ) -> Iterator[str]:
     """Yield the validated structured answer as one UI-compatible chunk."""
-    yield generate_legal_answer(query, contexts, model_name)
+    yield generate_legal_answer(query, contexts, model_name, history=history)

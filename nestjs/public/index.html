@@ -99,6 +99,13 @@
 
           <form id="queryForm" class="query-form">
             <div class="input-card">
+              <!-- Conversation Thread Indicator -->
+              <div class="conversation-pill hidden" id="conversationIndicator">
+                <span class="conv-icon">💬</span>
+                <span class="conv-text">Contextual Conversation Active (Turn <span id="conversationTurnCount">1</span>)</span>
+                <button type="button" class="conv-reset-btn" id="resetSessionBtn" title="Start fresh conversation">✕ New Chat</button>
+              </div>
+
               <textarea
                 id="queryInput"
                 class="query-input"

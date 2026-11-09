@@ -10,6 +10,7 @@ from redis.exceptions import RedisError
 
 from src.api.auth import require_api_key
 from src.api.config import Settings, get_settings
+from src.api.memory import get_conversation_memory
 from src.api.observability import (
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
@@ -17,7 +18,11 @@ from src.api.observability import (
     metrics_response,
 )
 from src.api.rate_limit import RateLimitMiddleware
-from src.api.schemas import QueryAPIRequest, QueryAPIResponse
+from src.api.schemas import (
+    ConversationHistoryResponse,
+    QueryAPIRequest,
+    QueryAPIResponse,
+)
 from src.api.services import RAGService
 from src.vectorstore.retriever import warm_up_embedding_model
 from src.vectorstore.postgres_store import PostgresVectorStore
@@ -198,3 +203,39 @@ def query(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(error),
         ) from error
+
+
+@app.get(
+    "/api/v1/conversations/{session_id}",
+    response_model=ConversationHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["conversations"],
+)
+def get_conversation_history(
+    session_id: str,
+    _: None = Security(require_api_key),
+) -> ConversationHistoryResponse:
+    """Retrieve the multi-turn conversation history for a session."""
+    memory = get_conversation_memory()
+    messages = memory.get_history(session_id)
+    return ConversationHistoryResponse(session_id=session_id, messages=messages)
+
+
+@app.delete(
+    "/api/v1/conversations/{session_id}",
+    status_code=status.HTTP_200_OK,
+    tags=["conversations"],
+)
+def clear_conversation(
+    session_id: str,
+    _: None = Security(require_api_key),
+) -> dict[str, str]:
+    """Clear conversational history and reset a session."""
+    memory = get_conversation_memory()
+    cleared = memory.clear_session(session_id)
+    return {
+        "status": "ok",
+        "session_id": session_id,
+        "cleared": "true" if cleared else "false",
+        "message": "Conversation session cleared.",
+    }

@@ -1,4 +1,12 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+} from "@nestjs/common";
 import {
   IsOptional,
   IsString,
@@ -17,6 +25,11 @@ export class QueryDto implements QueryRequest {
   @IsString()
   @MaxLength(20)
   chapter?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  session_id?: string | null;
 }
 
 @Controller()
@@ -27,5 +40,11 @@ export class QueryController {
   @HttpCode(HttpStatus.OK)
   query(@Body() request: QueryDto) {
     return this.queryService.forward(request);
+  }
+
+  @Delete("session/:sessionId")
+  @HttpCode(HttpStatus.OK)
+  clearSession(@Param("sessionId") sessionId: string) {
+    return this.queryService.clearSession(sessionId);
   }
 }

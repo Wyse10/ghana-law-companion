@@ -8,6 +8,7 @@ import {
 export interface QueryRequest {
   query: string;
   chapter?: string | null;
+  session_id?: string | null;
 }
 
 @Injectable()
@@ -35,6 +36,7 @@ export class QueryService {
         body: JSON.stringify({
           query: request.query.trim(),
           chapter: request.chapter || null,
+          session_id: request.session_id || null,
         }),
         signal: AbortSignal.timeout(65_000),
       });
@@ -51,6 +53,27 @@ export class QueryService {
       ) {
         throw error;
       }
+      throw new ServiceUnavailableException(
+        "FastAPI is unavailable.",
+        error instanceof Error ? error.message : undefined,
+      );
+    }
+  }
+
+  async clearSession(sessionId: string): Promise<unknown> {
+    try {
+      const response = await fetch(
+        `${this.fastApiUrl}/api/v1/conversations/${encodeURIComponent(sessionId)}`,
+        {
+          method: "DELETE",
+          headers: {
+            "X-API-Key": this.apiKey,
+          },
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+      return await response.json();
+    } catch (error) {
       throw new ServiceUnavailableException(
         "FastAPI is unavailable.",
         error instanceof Error ? error.message : undefined,
