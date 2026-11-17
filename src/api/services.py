@@ -5,6 +5,7 @@ from uuid import uuid4
 from src.api.memory import ConversationMemory, get_conversation_memory
 from src.api.schemas import QueryAPIRequest, QueryAPIResponse, QuerySource, QueryTiming
 from src.rag.generator import generate_legal_answer_structured, rerank_contexts
+from src.rag.history_aware import retrieve_relevant_context_history_aware
 from src.vectorstore.retriever import retrieve_relevant_context
 from src.vectorstore.store import LocalVectorStore
 
@@ -30,47 +31,21 @@ class RAGService:
             self.memory.set_history(session_id, request.messages)
 
         history_dicts = self.memory.get_history_dicts(session_id)
+        session_messages = self.memory.get_history(session_id)
 
-        # 2. Contextual retrieval for multi-turn follow-ups
+        # 2. History-Aware Retrieval for multi-turn sessions
         retrieval_started = perf_counter()
-        retrieval_query = request.query
-        if history_dicts:
-            contextual_query = self.memory.build_contextual_query(
-                session_id, request.query
-            )
-            retrieval_query = contextual_query
-
-        contexts = retrieve_relevant_context(
-            query=retrieval_query,
+        contexts, effective_query = retrieve_relevant_context_history_aware(
+            query=request.query,
             vector_store=self.vector_store,
+            history=session_messages,
             top_k=request.top_k,
             chapter_filter=request.chapter,
+            max_tokens=50,
+            strategy="last",
         )
 
-        # If contextual query was used and differed from raw query, supplement with raw query
-        if retrieval_query != request.query:
-            raw_contexts = retrieve_relevant_context(
-                query=request.query,
-                vector_store=self.vector_store,
-                top_k=request.top_k,
-                chapter_filter=request.chapter,
-            )
-            # Deduplicate by (chapter, article, clause, text)
-            seen = set()
-            merged = []
-            for ctx in contexts + raw_contexts:
-                key = (
-                    str(ctx.get("chapter_number", "")),
-                    str(ctx.get("article_number", "")),
-                    str(ctx.get("metadata", {}).get("clause_number", "")),
-                    ctx.get("text", "")[:80],
-                )
-                if key not in seen:
-                    seen.add(key)
-                    merged.append(ctx)
-            contexts = merged
-
-        contexts = rerank_contexts(retrieval_query, contexts)
+        contexts = rerank_contexts(effective_query, contexts)
         retrieval_ms = (perf_counter() - retrieval_started) * 1000
 
         # 3. Structured generation with conversation history

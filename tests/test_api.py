@@ -152,10 +152,23 @@ class FastAPITests(unittest.TestCase):
 
         service = RAGService(vector_store=fake_store, memory=memory)
 
+        mock_context = {
+            "text": "Article 8 text",
+            "article_number": "8",
+            "chapter_number": "3",
+            "score": 0.9,
+            "metadata": {
+                "chapter_number": "3",
+                "chapter_title": "Citizenship",
+                "article_number": "8",
+                "article_title": "Citizenship",
+                "page": 1,
+                "source": "pdf",
+            },
+        }
+
         with (
-            patch("src.api.services.retrieve_relevant_context", return_value=[
-                {"text": "Article 8 text", "article_number": "8", "chapter_number": "3", "score": 0.9}
-            ]),
+            patch("src.rag.history_aware.retrieve_relevant_context", return_value=[mock_context]),
             patch("src.api.services.generate_legal_answer_structured") as mock_gen,
             patch("src.api.main._get_rag_service", return_value=service),
         ):

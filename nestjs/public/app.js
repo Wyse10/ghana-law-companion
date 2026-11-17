@@ -37,6 +37,8 @@ let selectedChapterFilter = "";
 let currentResponseData = null;
 let currentSessionId = null;
 let sessionTurnCount = 0;
+let sessionTurns = [];
+let activeTurnIndex = -1;
 
 // DOM Elements
 const queryForm = document.getElementById("queryForm");
@@ -44,7 +46,9 @@ const queryInput = document.getElementById("queryInput");
 const chapterSelect = document.getElementById("chapterSelect");
 const submitBtn = document.getElementById("submitBtn");
 const clearBtn = document.getElementById("clearBtn");
-const chapterList = document.getElementById("chapterList");
+const sidebarNewChatBtn = document.getElementById("sidebarNewChatBtn");
+const sessionTurnBadge = document.getElementById("sessionTurnBadge");
+const sessionChatList = document.getElementById("sessionChatList");
 const suggestionsContainer = document.getElementById("suggestionsContainer");
 const conversationIndicator = document.getElementById("conversationIndicator");
 const conversationTurnCount = document.getElementById("conversationTurnCount");
@@ -52,7 +56,6 @@ const resetSessionBtn = document.getElementById("resetSessionBtn");
 
 const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
-const activeFilterBadge = document.getElementById("activeFilterBadge");
 
 const errorBanner = document.getElementById("errorBanner");
 const errorTitle = document.getElementById("errorTitle");
@@ -84,40 +87,78 @@ const confirmHelpBtn = document.getElementById("confirmHelpBtn");
 
 // Initialize application
 document.addEventListener("DOMContentLoaded", () => {
-  renderChapters();
+  renderSessionChat();
   populateChapterSelect();
   checkBackendHealth();
   attachEventListeners();
 });
 
-// Render Chapter List in Sidebar
-function renderChapters() {
-  chapterList.innerHTML = "";
-  
-  // "All Chapters" item
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.className = "chapter-item active";
-  allBtn.dataset.chapter = "";
-  allBtn.innerHTML = `
-    <span class="chapter-num">ALL</span>
-    <span class="chapter-title">Entire Constitution (1–26)</span>
-  `;
-  allBtn.addEventListener("click", () => selectChapter(""));
-  chapterList.appendChild(allBtn);
+// Render Session Chat in Sidebar
+function renderSessionChat() {
+  if (!sessionChatList) return;
+  sessionChatList.innerHTML = "";
 
-  // Individual Chapters
-  CONSTITUTION_CHAPTERS.forEach((ch) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "chapter-item";
-    btn.dataset.chapter = ch.num;
-    btn.innerHTML = `
-      <span class="chapter-num">CH ${ch.num}</span>
-      <span class="chapter-title">${ch.title}</span>
+  const turnCount = sessionTurns.length;
+  if (sessionTurnBadge) {
+    sessionTurnBadge.textContent = `${turnCount} ${turnCount === 1 ? "turn" : "turns"}`;
+  }
+
+  if (turnCount === 0) {
+    const empty = document.createElement("div");
+    empty.className = "session-empty-state";
+    empty.innerHTML = `
+      <span class="empty-icon">💬</span>
+      <p class="empty-title">No conversation turns yet</p>
+      <p class="empty-desc">Ask a constitutional question. Follow-ups will reference prior turns automatically.</p>
     `;
-    btn.addEventListener("click", () => selectChapter(ch.num));
-    chapterList.appendChild(btn);
+    sessionChatList.appendChild(empty);
+    return;
+  }
+
+  sessionTurns.forEach((item, index) => {
+    const card = document.createElement("div");
+    card.className = `session-turn-item ${index === activeTurnIndex ? "active" : ""}`;
+    card.dataset.index = index;
+
+    // Snippet of the answer
+    let cleanAnswer = (item.answer || "").replace(/\s+/g, " ").trim();
+    if (cleanAnswer.length > 90) {
+      cleanAnswer = cleanAnswer.slice(0, 90) + "...";
+    }
+
+    // Citations pills
+    const citationsHtml = (item.citations || [])
+      .slice(0, 3)
+      .map((cit) => `<span class="session-turn-cit-pill">📜 ${escapeHtml(cit)}</span>`)
+      .join("");
+
+    card.innerHTML = `
+      <div class="session-turn-header">
+        <span class="session-turn-badge">Turn ${item.turn}</span>
+        <span class="session-turn-time">${escapeHtml(item.time)}</span>
+      </div>
+      <div class="session-turn-query">
+        <span class="turn-icon">👤</span>
+        <span>${escapeHtml(item.query)}</span>
+      </div>
+      <div class="session-turn-answer-snippet">
+        <span class="turn-icon">⚖️</span>
+        <span>${escapeHtml(cleanAnswer)}</span>
+      </div>
+      ${citationsHtml ? `<div class="session-turn-citations">${citationsHtml}</div>` : ""}
+    `;
+
+    card.addEventListener("click", () => {
+      activeTurnIndex = index;
+      renderSessionChat();
+      if (item.data) {
+        renderResults(item.data, item.query, false);
+      }
+      resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      sidebar.classList.remove("open");
+    });
+
+    sessionChatList.appendChild(card);
   });
 }
 
@@ -131,24 +172,12 @@ function populateChapterSelect() {
   });
 }
 
-// Select Chapter (syncs sidebar and dropdown)
+// Select Chapter (syncs dropdown filter)
 function selectChapter(chapterNum) {
   selectedChapterFilter = chapterNum;
-  chapterSelect.value = chapterNum;
-  activeFilterBadge.textContent = chapterNum ? `Ch ${chapterNum}` : "All";
-
-  // Update active class on sidebar items
-  document.querySelectorAll(".chapter-item").forEach((item) => {
-    if (item.dataset.chapter === chapterNum) {
-      item.classList.add("active");
-      item.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    } else {
-      item.classList.remove("active");
-    }
-  });
-
-  // Close mobile sidebar if open
-  sidebar.classList.remove("open");
+  if (chapterSelect) {
+    chapterSelect.value = chapterNum;
+  }
 }
 
 // Check Backend Connectivity
@@ -215,6 +244,11 @@ function attachEventListeners() {
   // Reset conversation button
   if (resetSessionBtn) {
     resetSessionBtn.addEventListener("click", resetConversation);
+  }
+
+  // Sidebar New Chat button
+  if (sidebarNewChatBtn) {
+    sidebarNewChatBtn.addEventListener("click", resetConversation);
   }
 
   // Clear button
@@ -297,7 +331,7 @@ async function handleSubmit(e) {
     }
 
     currentResponseData = data;
-    renderResults(data);
+    renderResults(data, query, true);
   } catch (error) {
     showError(
       "Query Execution Error",
@@ -324,7 +358,7 @@ function updateLoadingStep(stepMsg) {
 }
 
 // Render Results View
-function renderResults(data) {
+function renderResults(data, query = "", addToHistory = true) {
   resultsSection.classList.remove("hidden");
 
   // Format and render answer in clear, highly readable format
@@ -365,6 +399,22 @@ function renderResults(data) {
   }
   updateConversationUI();
 
+  // Add turn to session chat list on the left sidebar
+  if (addToHistory) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    sessionTurns.push({
+      turn: sessionTurnCount || sessionTurns.length + 1,
+      query: query || queryInput.value.trim() || "Constitutional Question",
+      answer: rawAnswer,
+      citations: citations,
+      time: timeStr,
+      data: data,
+    });
+    activeTurnIndex = sessionTurns.length - 1;
+    renderSessionChat();
+  }
+
   // Smooth scroll to results
   resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -394,7 +444,11 @@ async function resetConversation() {
   }
   currentSessionId = null;
   sessionTurnCount = 0;
+  sessionTurns = [];
+  activeTurnIndex = -1;
+  renderSessionChat();
   updateConversationUI();
+  resultsSection.classList.add("hidden");
   queryInput.value = "";
   queryInput.focus();
   showToast("Started fresh conversation.");

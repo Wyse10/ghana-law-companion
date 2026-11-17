@@ -165,3 +165,17 @@ def retrieve_relevant_context(
     return [top_semantic_chunk.model_dump(mode="json")] + [
         chunk.model_dump(mode="json") for _, _, chunk in ranked[: top_k - 1]
     ]
+
+
+def __getattr__(name: str) -> Any:
+    if name in {
+        "HistoryAwareRetriever",
+        "retrieve_relevant_context_history_aware",
+        "create_history_aware_retriever",
+        "reformulate_question_history_aware",
+        "RETRIEVER_SYSTEM_PROMPT",
+    }:
+        import src.rag.history_aware as ha
+
+        return getattr(ha, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -21,7 +21,7 @@
   <!-- Main Application Wrapper -->
   <div class="app-layout">
     
-    <!-- Left Navigation / Chapter Explorer -->
+    <!-- Left Navigation / Session Chat Explorer -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="brand">
@@ -31,7 +31,7 @@
             <p class="brand-subtitle">1992 Constitution of Ghana</p>
           </div>
         </div>
-        <button class="icon-btn mobile-only" id="closeSidebarBtn" title="Close Chapters">✕</button>
+        <button class="icon-btn mobile-only" id="closeSidebarBtn" title="Close Chat">✕</button>
       </div>
 
       <div class="sidebar-meta-card">
@@ -44,8 +44,8 @@
           <span class="meta-value">348 Clauses</span>
         </div>
         <div class="meta-row">
-          <span class="meta-label">Embeddings</span>
-          <span class="meta-value">BAAI/bge-base-en</span>
+          <span class="meta-label">Retriever</span>
+          <span class="meta-value">History-Aware RAG</span>
         </div>
         <div class="meta-row">
           <span class="meta-label">Grounding</span>
@@ -53,13 +53,20 @@
         </div>
       </div>
 
-      <div class="sidebar-section-title">
-        <span>Constitutional Chapters (26)</span>
-        <span class="chapter-count-pill" id="activeFilterBadge">All</span>
+      <!-- New Chat Button & Session Control -->
+      <div class="session-actions-card">
+        <button type="button" class="btn-new-chat" id="sidebarNewChatBtn" title="Start a new chat session">
+          <span class="btn-icon">＋</span> New Chat
+        </button>
       </div>
 
-      <div class="chapter-list" id="chapterList">
-        <!-- Dynamically populated chapters -->
+      <div class="sidebar-section-title">
+        <span>Session Chat</span>
+        <span class="chapter-count-pill" id="sessionTurnBadge">0 turns</span>
+      </div>
+
+      <div class="session-chat-list" id="sessionChatList">
+        <!-- Dynamically populated session turns -->
       </div>
 
       <div class="sidebar-footer">
@@ -75,8 +82,8 @@
       
       <!-- Top Bar -->
       <header class="topbar">
-        <button class="sidebar-toggle-btn mobile-only" id="openSidebarBtn" aria-label="Toggle Chapters">
-          <span>☰</span> Chapters
+        <button class="sidebar-toggle-btn mobile-only" id="openSidebarBtn" aria-label="Toggle Session Chat">
+          <span>💬</span> Session Chat
         </button>
         <div class="topbar-center">
           <span class="topbar-tag">Verified Constitutional RAG</span>

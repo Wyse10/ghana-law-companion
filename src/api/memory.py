@@ -3,9 +3,16 @@ from __future__ import annotations
 import re
 import time
 from threading import Lock
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    trim_messages,
+)
 from pydantic import BaseModel, Field
 
 
@@ -22,6 +29,98 @@ class ChatMessage(BaseModel):
         default_factory=time.time,
         description="Unix timestamp when the message was recorded.",
     )
+
+    def to_langchain(self) -> BaseMessage:
+        """Convert ChatMessage into a LangChain BaseMessage."""
+        if self.role == "user":
+            return HumanMessage(content=self.content)
+        if self.role == "assistant":
+            return AIMessage(content=self.content)
+        if self.role == "system":
+            return SystemMessage(content=self.content)
+        return HumanMessage(content=self.content)
+
+
+def to_langchain_messages(
+    messages: list[ChatMessage] | list[dict[str, Any]] | list[BaseMessage],
+) -> list[BaseMessage]:
+    """Convert ChatMessage or dict list into LangChain BaseMessage objects."""
+    lc_messages: list[BaseMessage] = []
+    for msg in messages:
+        if isinstance(msg, BaseMessage):
+            lc_messages.append(msg)
+        elif isinstance(msg, ChatMessage):
+            lc_messages.append(msg.to_langchain())
+        elif isinstance(msg, dict):
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "user":
+                lc_messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                lc_messages.append(AIMessage(content=content))
+            elif role == "system":
+                lc_messages.append(SystemMessage(content=content))
+            else:
+                lc_messages.append(HumanMessage(content=content))
+    return lc_messages
+
+
+def from_langchain_messages(
+    messages: list[BaseMessage],
+) -> list[ChatMessage]:
+    """Convert LangChain BaseMessage objects into ChatMessage instances."""
+    chat_messages: list[ChatMessage] = []
+    for msg in messages:
+        role = "user"
+        if isinstance(msg, AIMessage):
+            role = "assistant"
+        elif isinstance(msg, SystemMessage):
+            role = "system"
+        elif isinstance(msg, HumanMessage):
+            role = "user"
+        elif hasattr(msg, "type"):
+            role = "assistant" if msg.type == "ai" else "user"
+        chat_messages.append(
+            ChatMessage(
+                role=role,
+                content=msg.content if isinstance(msg.content, str) else str(msg.content),
+                timestamp=time.time(),
+            )
+        )
+    return chat_messages
+
+
+def trim_conversation_messages(
+    messages: list[ChatMessage] | list[BaseMessage] | list[dict[str, Any]],
+    max_tokens: int = 50,
+    strategy: Literal["first", "last"] = "last",
+) -> list[BaseMessage]:
+    """Trim conversation messages using LangChain's trim_messages utility.
+
+    Applies strategy='last' and max_tokens=50 by default.
+    """
+    lc_messages = to_langchain_messages(messages)
+    if not lc_messages:
+        return []
+    try:
+        return trim_messages(
+            lc_messages,
+            max_tokens=max_tokens,
+            strategy=strategy,
+            token_counter="approximate",
+        )
+    except Exception:
+        def _approx_tokens(msgs: list[BaseMessage] | BaseMessage) -> int:
+            if isinstance(msgs, list):
+                return sum(max(1, len(m.content.split()) * 4 // 3) for m in msgs)
+            return max(1, len(msgs.content.split()) * 4 // 3)
+
+        return trim_messages(
+            lc_messages,
+            max_tokens=max_tokens,
+            strategy=strategy,
+            token_counter=_approx_tokens,
+        )
 
 
 class ConversationSession:
@@ -57,6 +156,22 @@ class ConversationSession:
         max_messages = max_turns * 2
         if len(self.messages) > max_messages:
             self.messages = self.messages[-max_messages:]
+
+    def trim_by_tokens(
+        self,
+        max_tokens: int = 50,
+        strategy: Literal["first", "last"] = "last",
+    ) -> None:
+        """Trim messages to max_tokens using LangChain's trim_messages utility."""
+        trimmed_lc = trim_conversation_messages(
+            self.messages, max_tokens=max_tokens, strategy=strategy
+        )
+        self.messages = from_langchain_messages(trimmed_lc)
+        self.updated_at = time.time()
+
+    def to_langchain_messages(self) -> list[BaseMessage]:
+        """Convert session messages to LangChain BaseMessage objects."""
+        return to_langchain_messages(self.messages)
 
     def get_citations(self) -> set[str]:
         """Collect all citations mentioned across assistant turns."""
@@ -119,6 +234,37 @@ class ConversationMemory:
                 }
                 for m in session.messages
             ]
+
+    def get_trimmed_messages(
+        self,
+        session_id: str,
+        max_tokens: int = 50,
+        strategy: Literal["first", "last"] = "last",
+    ) -> list[ChatMessage]:
+        """Return conversation messages trimmed to max_tokens using LangChain's trim_messages."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if not session:
+                return []
+            trimmed_lc = trim_conversation_messages(
+                session.messages, max_tokens=max_tokens, strategy=strategy
+            )
+            return from_langchain_messages(trimmed_lc)
+
+    def get_trimmed_langchain_messages(
+        self,
+        session_id: str,
+        max_tokens: int = 50,
+        strategy: Literal["first", "last"] = "last",
+    ) -> list[BaseMessage]:
+        """Return conversation messages as LangChain BaseMessage objects trimmed to max_tokens."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if not session:
+                return []
+            return trim_conversation_messages(
+                session.messages, max_tokens=max_tokens, strategy=strategy
+            )
 
     def add_turn(
         self,

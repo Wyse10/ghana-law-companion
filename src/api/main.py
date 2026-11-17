@@ -205,6 +205,16 @@ def query(
         ) from error
 
 
+def _get_memory() -> ConversationMemory:
+    try:
+        service = _get_rag_service()
+        if hasattr(service, "memory") and service.memory is not None:
+            return service.memory
+    except Exception:
+        pass
+    return get_conversation_memory()
+
+
 @app.get(
     "/api/v1/conversations/{session_id}",
     response_model=ConversationHistoryResponse,
@@ -216,7 +226,7 @@ def get_conversation_history(
     _: None = Security(require_api_key),
 ) -> ConversationHistoryResponse:
     """Retrieve the multi-turn conversation history for a session."""
-    memory = get_conversation_memory()
+    memory = _get_memory()
     messages = memory.get_history(session_id)
     return ConversationHistoryResponse(session_id=session_id, messages=messages)
 
@@ -231,7 +241,7 @@ def clear_conversation(
     _: None = Security(require_api_key),
 ) -> dict[str, str]:
     """Clear conversational history and reset a session."""
-    memory = get_conversation_memory()
+    memory = _get_memory()
     cleared = memory.clear_session(session_id)
     return {
         "status": "ok",
